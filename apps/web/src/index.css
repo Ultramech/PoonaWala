@@ -1,0 +1,307 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ─────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  html {
+    @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  body {
+    @apply bg-surface-0 text-white font-sans;
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Prevent overscroll bounce on iOS */
+  html, body {
+    overscroll-behavior: none;
+    overflow-x: hidden;
+  }
+
+  /* Remove default button styles */
+  button { cursor: pointer; border: none; background: none; }
+
+  /* Selection */
+  ::selection {
+    background: rgba(212, 160, 23, 0.3);
+    color: white;
+  }
+}
+
+/* ─── Components ────────────────────────────────────────────── */
+@layer components {
+
+  /* --- Buttons --- */
+  .btn-gold {
+    @apply relative inline-flex items-center justify-center gap-2
+           px-6 py-4 rounded-2xl font-display font-semibold text-base
+           bg-gold-gradient text-surface-0
+           transition-all duration-200 ease-out
+           shadow-gold active:scale-[0.97]
+           select-none overflow-hidden;
+  }
+  .btn-gold::after {
+    content: '';
+    @apply absolute inset-0 rounded-2xl bg-white/0 transition-colors duration-200;
+  }
+  .btn-gold:hover::after { @apply bg-white/10; }
+  .btn-gold:active::after { @apply bg-white/20; }
+  .btn-gold:disabled { @apply opacity-40 cursor-not-allowed; }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           px-6 py-4 rounded-2xl font-display font-medium text-base
+           text-white/70 border border-white/10
+           transition-all duration-200 ease-out
+           hover:bg-white/5 hover:text-white hover:border-white/20
+           active:scale-[0.97] select-none;
+  }
+
+  .btn-outline-gold {
+    @apply inline-flex items-center justify-center gap-2
+           px-6 py-4 rounded-2xl font-display font-semibold text-base
+           text-gold-400 border border-gold-500/40
+           transition-all duration-200 ease-out
+           hover:bg-gold-500/10 hover:border-gold-400/60
+           active:scale-[0.97] select-none;
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center
+           w-12 h-12 rounded-2xl
+           bg-white/5 border border-white/10
+           transition-all duration-200
+           hover:bg-white/10 active:scale-[0.93]
+           select-none;
+  }
+
+  /* --- Cards --- */
+  .card {
+    @apply bg-surface-2 rounded-3xl border border-white/5 shadow-card;
+  }
+
+  .card-glass {
+    @apply bg-white/[0.04] backdrop-blur-md rounded-3xl
+           border border-white/[0.08] shadow-card;
+  }
+
+  .card-gold {
+    @apply bg-surface-2 rounded-3xl border border-gold-500/20
+           shadow-gold-sm;
+  }
+
+  /* --- Inputs --- */
+  .input-field {
+    @apply w-full px-4 py-4 rounded-2xl
+           bg-surface-3 border border-white/10 text-white
+           placeholder-white/30 font-sans text-base
+           transition-all duration-200 outline-none
+           focus:border-gold-500/60 focus:ring-0 focus:shadow-gold-sm;
+  }
+
+  /* --- Labels --- */
+  .label {
+    @apply text-sm font-medium text-white/50 uppercase tracking-wider;
+  }
+
+  /* --- Badges --- */
+  .badge-gold {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-gold-500/15 text-gold-400 border border-gold-500/25;
+  }
+  .badge-green {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-green-500/15 text-green-400 border border-green-500/25;
+  }
+  .badge-red {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-red-500/15 text-red-400 border border-red-500/25;
+  }
+  .badge-orange {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-orange-500/15 text-orange-400 border border-orange-500/25;
+  }
+  .badge-blue {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-blue-500/15 text-blue-400 border border-blue-500/25;
+  }
+
+  /* --- Progress bars --- */
+  .progress-bar {
+    @apply h-1 rounded-full bg-surface-4 overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full bg-gold-gradient transition-all duration-500 ease-out;
+  }
+
+  /* --- Step indicators --- */
+  .step-dot {
+    @apply w-2 h-2 rounded-full bg-white/20 transition-all duration-300;
+  }
+  .step-dot-active {
+    @apply w-6 h-2 rounded-full bg-gold-500 transition-all duration-300;
+  }
+  .step-dot-done {
+    @apply w-2 h-2 rounded-full bg-gold-500/50 transition-all duration-300;
+  }
+
+  /* --- Camera overlay elements --- */
+  .cam-overlay {
+    @apply absolute inset-0 pointer-events-none;
+  }
+
+  .cam-corner {
+    @apply absolute w-8 h-8 border-gold-400;
+  }
+  .cam-corner-tl { @apply top-4 left-4 border-t-2 border-l-2 rounded-tl-xl; }
+  .cam-corner-tr { @apply top-4 right-4 border-t-2 border-r-2 rounded-tr-xl; }
+  .cam-corner-bl { @apply bottom-4 left-4 border-b-2 border-l-2 rounded-bl-xl; }
+  .cam-corner-br { @apply bottom-4 right-4 border-b-2 border-r-2 rounded-br-xl; }
+
+  /* --- Skeleton loaders --- */
+  .skeleton {
+    @apply rounded-2xl bg-white/5 animate-pulse;
+    background-image: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* --- Dividers --- */
+  .divider { @apply h-px bg-white/[0.06] w-full; }
+  .divider-gold { @apply h-px bg-gold-500/20 w-full; }
+
+  /* --- Confidence score ring --- */
+  .confidence-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+
+  /* --- Safe area padding --- */
+  .pb-safe { padding-bottom: max(1.5rem, var(--safe-bottom)); }
+  .pt-safe { padding-top: max(1rem, var(--safe-top)); }
+  .px-safe { @apply px-5; }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #F5C842 0%, #D4A017 60%, #F5C842 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-white {
+    background: linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glassmorphism {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glassmorphism-gold {
+    background: rgba(212, 160, 23, 0.06);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(212, 160, 23, 0.15);
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Touch target minimum 48px */
+  .touch-target {
+    @apply min-h-[48px] min-w-[48px];
+  }
+
+  /* High-contrast text for low-literacy users */
+  .text-high-contrast { @apply text-white font-semibold; }
+}
+
+/* ─── Custom SVG animations ─────────────────────────────────── */
+@keyframes dashDraw {
+  from { stroke-dashoffset: 300; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.svg-draw {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: dashDraw 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Camera video full-bleed ──────────────────────────────── */
+.camera-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background: #000;
+}
+
+.camera-viewport video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── Result screen band animation ─────────────────────────── */
+.band-track {
+  @apply relative h-3 rounded-full bg-surface-4 overflow-hidden;
+}
+
+.band-fill {
+  @apply absolute top-0 h-full rounded-full;
+  animation: bandDraw 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+/* ─── Scrollable page layout ─────────────────────────────────  */
+.page {
+  @apply min-h-screen flex flex-col bg-surface-0 pt-safe pb-safe;
+}
+
+.page-header {
+  @apply flex items-center justify-between px-5 py-4;
+}
+
+.page-content {
+  @apply flex-1 px-safe;
+}
+
+/* ─── Micro-interaction: tap flash ──────────────────────────── */
+@keyframes tapFlash {
+  0%   { opacity: 0.4; transform: scale(0.95); }
+  100% { opacity: 0;   transform: scale(1.1); }
+}
+
+.tap-flash::after {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-white pointer-events-none opacity-0;
+  animation: tapFlash 0.3s ease-out forwards;
+}
