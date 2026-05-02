@@ -6,3 +6,6 @@ __pycache__
 ml/models/*.bin
 ml/models/*.pt
 .DS_Store
+dist/
+*.tsbuildinfo
+
