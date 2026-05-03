@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional, Union
 """
 ML-layer routing decision (FR-DEC-02).
 Two-layer evaluation: RBI hard rules → ML confidence routing.
@@ -8,7 +10,6 @@ Buckets (PRD §9.1):
   RECAPTURE — any signal returned low quality with recoverable cause
   REJECT   — fraud > 0.7, or confidence < 0.4
 """
-from __future__ import annotations
 
 
 def route_session(
@@ -16,7 +17,7 @@ def route_session(
     fraud_score: float,
     loan_inr: float,
     huid_verified: bool,
-    rbi_reject_reason: str | None = None,
+    rbi_reject_reason: Optional[str] = None,
 ) -> str:
     if rbi_reject_reason:
         return "REJECT"
