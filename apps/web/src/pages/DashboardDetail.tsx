@@ -43,7 +43,7 @@ export function DashboardDetail() {
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-zinc-950"><Loader2 className="h-8 w-8 animate-spin text-amber-500" /></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-zinc-950"><Loader2 className="h-8 w-8 animate-spin text-poonawala-red" /></div>;
   if (!data || !data.assessment) return <div className="flex h-screen items-center justify-center text-white bg-zinc-950">Session not found or not finalized.</div>;
 
   const { assessment, session } = data;
@@ -62,7 +62,7 @@ export function DashboardDetail() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Session Review</CardTitle>
-                  <Badge variant="outline" className="border-amber-500/50 text-amber-500">{assessment.routing}</Badge>
+                  <Badge variant="outline" className="border-poonawala-red/50 text-poonawala-red">{assessment.routing}</Badge>
                 </div>
                 <CardDescription className="text-zinc-400">{session.phone} • {new Date(session.created_at).toLocaleString()}</CardDescription>
               </CardHeader>
@@ -87,7 +87,7 @@ export function DashboardDetail() {
                 </div>
 
                 <div className="pt-4 border-t border-zinc-800">
-                  <h4 className="text-sm font-medium text-zinc-300 mb-2">AI Reasoning</h4>
+                  <h4 className="text-sm font-medium text-zinc-300 mb-2">Poonawala AI Reasoning</h4>
                   <p className="text-sm text-zinc-400 bg-black/20 p-3 rounded-md italic">
                     "{assessment.reasoning_text.text}"
                   </p>
@@ -131,7 +131,7 @@ export function DashboardDetail() {
                 <div className="space-y-2">
                   <label className="text-sm text-zinc-400">Decision Notes / Reason</label>
                   <Textarea 
-                    className="bg-black/20 border-zinc-800 focus:border-amber-500 text-white min-h-[100px]"
+                    className="bg-black/20 border-zinc-800 focus:border-poonawala-red text-white min-h-[100px]"
                     placeholder="Enter notes for field agent or audit log..."
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -148,7 +148,7 @@ export function DashboardDetail() {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                    className="w-full border-poonawala-red/50 text-poonawala-red hover:bg-poonawala-red/10"
                     disabled={actionLoading}
                     onClick={() => handleAction('request_recapture')}
                   >

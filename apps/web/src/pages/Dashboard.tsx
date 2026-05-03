@@ -36,7 +36,7 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-zinc-950 text-white">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-poonawala-red" />
       </div>
     );
   }
@@ -46,14 +46,14 @@ export function Dashboard() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">NBFC Risk Dashboard</h1>
-          <Badge variant="outline" className="border-amber-500/30 text-amber-500">
+          <Badge variant="outline" className="border-poonawala-red/30 text-poonawala-red">
             {sessions.length} Active Sessions
           </Badge>
         </div>
 
         <div className="grid gap-4">
           {sessions.map(session => (
-            <Card key={session.session_id} className="bg-zinc-900 border-zinc-800 cursor-pointer hover:border-amber-500/50 transition-colors"
+            <Card key={session.session_id} className="bg-zinc-900 border-zinc-800 cursor-pointer hover:border-poonawala-red/50 transition-colors"
               onClick={() => navigate(`/dashboard/session/${session.session_id}`)}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="space-y-1">
@@ -72,7 +72,7 @@ export function Dashboard() {
                   {session.confidence_score !== null && (
                     <div className="text-right">
                       <div className="text-sm text-zinc-400">Confidence</div>
-                      <div className="font-medium text-amber-500">
+                      <div className="font-medium text-poonawala-red">
                         {(session.confidence_score * 100).toFixed(1)}%
                       </div>
                     </div>
