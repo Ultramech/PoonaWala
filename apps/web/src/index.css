@@ -50,7 +50,7 @@
   .btn-gold {
     @apply relative inline-flex items-center justify-center gap-2
            px-6 py-4 rounded-2xl font-display font-semibold text-base
-           bg-gold-gradient text-surface-0
+           bg-poonawala-red text-white
            transition-all duration-200 ease-out
            shadow-gold active:scale-[0.97]
            select-none overflow-hidden;
@@ -151,7 +151,7 @@
     @apply h-1 rounded-full bg-surface-4 overflow-hidden;
   }
   .progress-fill {
-    @apply h-full rounded-full bg-gold-gradient transition-all duration-500 ease-out;
+    @apply h-full rounded-full bg-poonawala-red transition-all duration-500 ease-out;
   }
 
   /* --- Step indicators --- */
@@ -203,8 +203,8 @@
 
 /* ─── Utilities ─────────────────────────────────────────────── */
 @layer utilities {
-  .text-gradient-gold {
-    background: linear-gradient(135deg, #F5C842 0%, #D4A017 60%, #F5C842 100%);
+  .text-gradient-poonawala {
+    background: linear-gradient(135deg, #e31d25 0%, #b3141b 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -283,7 +283,7 @@
 
 /* ─── Scrollable page layout ─────────────────────────────────  */
 .page {
-  @apply min-h-screen flex flex-col bg-surface-0 pt-safe pb-safe;
+  @apply h-screen flex flex-col bg-surface-0 pt-safe pb-safe overflow-y-auto;
 }
 
 .page-header {
