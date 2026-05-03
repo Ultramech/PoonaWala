@@ -51,8 +51,8 @@ export function Consent() {
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-6">
         {/* Hero icon */}
         <div className="flex flex-col items-center py-8">
-          <div className="w-20 h-20 rounded-3xl bg-gold-500/10 border border-gold-500/20 flex items-center justify-center mb-6 shadow-gold-sm">
-            <Shield className="w-10 h-10 text-gold-400" />
+          <div className="w-20 h-20 rounded-3xl bg-poonawala-red/10 border border-poonawala-red/20 flex items-center justify-center mb-6 shadow-gold-sm">
+            <Shield className="w-10 h-10 text-poonawala-red" />
           </div>
           <h1 className="font-display font-bold text-2xl text-white text-center mb-2">
             {t('consent_heading')}
@@ -63,15 +63,15 @@ export function Consent() {
         </div>
 
         {/* Data collected */}
-        <div className="card-gold p-4 mb-4">
-          <h2 className="text-xs font-semibold text-gold-400/80 uppercase tracking-wider mb-3">
+        <div className="card-red p-4 mb-4 border border-poonawala-red/20 rounded-3xl bg-surface-2">
+          <h2 className="text-xs font-semibold text-poonawala-red/80 uppercase tracking-wider mb-3">
             Data we collect
           </h2>
           <div className="space-y-3">
             {DATA_ITEMS.map(({ icon: Icon, key }) => (
               <div key={key} className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-gold-500/10 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-3.5 h-3.5 text-gold-400" />
+                <div className="w-7 h-7 rounded-lg bg-poonawala-red/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-3.5 h-3.5 text-poonawala-red" />
                 </div>
                 <span className="text-sm text-white/70">{key}</span>
               </div>
