@@ -4,6 +4,24 @@ import { useTranslation } from 'react-i18next'
 import { useSessionStore, type AssessmentResult, type SessionState } from '../store/session'
 import { assessAPI } from '../lib/api'
 
+// ─── Image resize helper (reduces payload from phone cameras) ────────────────
+function resizeDataUrl(dataUrl: string, maxPx: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    img.onerror = reject
+    img.src = dataUrl
+  })
+}
+
 // ─── Mock fallback (used when API is unreachable) ─────────────────────────────
 
 function buildMockResult(sessionId: string, weightG: number | null, isFailCase = false): AssessmentResult {
@@ -82,18 +100,24 @@ function buildMockResult(sessionId: string, weightG: number | null, isFailCase =
   }
 }
 
-async function assessSession(state: SessionState): Promise<AssessmentResult> {
+async function assessSession(state: SessionState): Promise<AssessmentResult> { // eslint-disable-line
   const sessionId = state.sessionId ?? 'demo'
   const weightG = state.weightG
 
   // Send real base64 dataUrls for photo frames so VLM can process actual images.
-  // Non-photo captures (audio, video, selfie) are sent as opaque handles.
+  // Downscale to 1280px max to reduce payload size from phone cameras.
   const captureTypes = Object.keys(state.captures) as (keyof typeof state.captures)[]
   const photoTypes = captureTypes.filter(k => k !== 'audio' && k !== 'video' && k !== 'selfie')
-  const frames = photoTypes.map(k => {
+  const frames = await Promise.all(photoTypes.map(async k => {
     const cap = state.captures[k as keyof typeof state.captures]
-    return cap?.dataUrl ?? `local://${sessionId}/${k}`
-  })
+    const url = cap?.dataUrl
+    if (!url || url.startsWith('local://')) return `local://${sessionId}/${k}`
+    try {
+      return await resizeDataUrl(url, 1280)
+    } catch {
+      return url
+    }
+  }))
   const videoCapture = state.captures['video']
   const audioCapture = state.captures['audio']
   const selfieCapture = state.captures['selfie']
@@ -170,19 +194,19 @@ export function Processing() {
   return (
     <div className="page items-center justify-center animate-fade-in">
       {/* Background glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full bg-gold-500/8 blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full bg-poonawala-red/8 blur-3xl pointer-events-none" />
 
       <div className="flex flex-col items-center px-8 text-center">
         {/* Animated logo */}
         <div className={`relative w-28 h-28 mb-8 ${done ? 'animate-scale-in' : ''}`}>
-          <div className="absolute inset-0 rounded-3xl bg-gold-500/10 border border-gold-500/20" />
+          <div className="absolute inset-0 rounded-3xl bg-poonawala-red/10 border border-poonawala-red/20" />
           {/* Spinning ring */}
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 112 112">
-            <circle cx="56" cy="56" r="50" fill="none" stroke="rgba(212,160,23,0.15)" strokeWidth="3" />
+            <circle cx="56" cy="56" r="50" fill="none" stroke="rgba(227,29,37,0.15)" strokeWidth="3" />
             <circle
               cx="56" cy="56" r="50"
               fill="none"
-              stroke="#D4A017"
+              stroke="#e31d25"
               strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray={`${pct * 3.14} 314`}
@@ -220,7 +244,7 @@ export function Processing() {
                 i < activeStep
                   ? 'bg-green-500'
                   : i === activeStep
-                    ? 'bg-gold-500 animate-pulse-gold'
+                    ? 'bg-poonawala-red animate-pulse'
                     : 'bg-surface-4'
               }`}>
                 {i < activeStep ? (
