@@ -4,10 +4,13 @@ from sqlalchemy.orm import declarative_base
 
 # Fallback to sqlite for dev if Postgres URL is not provided
 # but the plan demands Postgres, so we use async psycopg by default.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "sqlite+aiosqlite:///./goldeye.db" if not os.getenv("POSTGRES_DB") else "postgresql+psycopg://goldeye:goldeye_dev@localhost:5432/goldeye"
-)
+_raw_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./goldeye.db")
+# Render (and Heroku) issue postgres:// — SQLAlchemy needs postgresql+psycopg://
+if _raw_url.startswith("postgres://"):
+    _raw_url = _raw_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif _raw_url.startswith("postgresql://") and "+psycopg" not in _raw_url:
+    _raw_url = _raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
+DATABASE_URL = _raw_url
 
 # SQLite async driver needs different connection args than Postgres
 connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
