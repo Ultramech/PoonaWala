@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poonawala GoldEye — Phone Verification (2Factor)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0a0a0f;
+      color: #e8e8ec;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(20,20,30,0.95), rgba(12,12,18,0.98));
+      border: 1px solid rgba(227, 29, 37, 0.15);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 80px rgba(227,29,37,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: -1px; right: -1px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #e31d25, #b3141b, #e31d25, transparent);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .logo span {
+      font-size: 32px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #e31d25, #b3141b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 32px;
+    }
+
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .step-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.15);
+      transition: all 0.4s ease;
+    }
+    .step-dot.active {
+      background: #e31d25;
+      border-color: #b3141b;
+      box-shadow: 0 0 12px rgba(227,29,37,0.5);
+    }
+    .step-dot.done {
+      background: #22c55e;
+      border-color: #4ade80;
+    }
+    .step-line {
+      width: 40px; height: 2px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 1px;
+      transition: background 0.4s;
+    }
+    .step-line.done { background: #22c55e; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 8px;
+    }
+
+    .input-group {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .input-group .prefix {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px;
+      color: rgba(255,255,255,0.35);
+      pointer-events: none;
+      font-weight: 500;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px 14px 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      outline: none;
+      transition: all 0.25s;
+    }
+    input:focus {
+      border-color: rgba(227,29,37,0.5);
+      box-shadow: 0 0 0 3px rgba(227,29,37,0.1);
+      background: rgba(255,255,255,0.06);
+    }
+    input::placeholder { color: rgba(255,255,255,0.2); }
+    input.otp-input {
+      padding-left: 16px;
+      text-align: center;
+      font-size: 28px;
+      letter-spacing: 0.3em;
+      font-weight: 700;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #e31d25, #b3141b);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(227,29,37,0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 30px rgba(212,160,23,0.45);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn 0.3s ease;
+    }
+    .alert.show { display: flex; }
+    .alert-error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #fca5a5;
+    }
+    .alert-success {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.2);
+      color: #86efac;
+    }
+    .alert-info {
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.2);
+      color: #93c5fd;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(10,10,15,0.2);
+      border-top-color: #0a0a0f;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    .success-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: rgba(34,197,94,0.1);
+      border: 2px solid #22c55e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .resend-row {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+    .resend-row a {
+      color: #d4a017;
+      text-decoration: none;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .resend-row a:hover { text-decoration: underline; }
+    .resend-row a.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .hidden { display: none !important; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo"><span>🔐</span></div>
+  <h1>Verify Your Phone</h1>
+  <p class="subtitle">Secure OTP verification via 2Factor.in</p>
+
+  <!-- Step indicator -->
+  <div class="step-indicator">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <!-- Alert -->
+  <div class="alert" id="alert">
+    <span id="alertIcon"></span>
+    <span id="alertMsg"></span>
+  </div>
+
+  <!-- STEP 1: Phone Input -->
+  <div id="step1">
+    <label>Phone Number</label>
+    <div class="input-group">
+      <span class="prefix">+91</span>
+      <input
+        type="tel"
+        id="phoneInput"
+        placeholder="98765 43210"
+        maxlength="10"
+        autocomplete="tel"
+      />
+    </div>
+    <button class="btn-primary" id="sendBtn" onclick="sendOTP()">
+      Send OTP
+    </button>
+  </div>
+
+  <!-- STEP 2: OTP Input -->
+  <div id="step2" class="hidden">
+    <label>Enter 6-digit OTP</label>
+    <div class="input-group">
+      <input
+        type="text"
+        id="otpInput"
+        class="otp-input"
+        placeholder="● ● ● ● ● ●"
+        maxlength="6"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        autocomplete="one-time-code"
+      />
+    </div>
+    <button class="btn-primary" id="verifyBtn" onclick="verifyOTP()">
+      Verify OTP
+    </button>
+    <div class="resend-row">
+      Didn't get it? <a id="resendLink" onclick="sendOTP()">Resend OTP</a>
+      <span id="resendTimer"></span>
+    </div>
+    <button class="btn-ghost" style="margin-top: 12px" onclick="goBack()">
+      ← Change number
+    </button>
+  </div>
+
+  <!-- STEP 3: Success -->
+  <div id="step3" class="hidden">
+    <div class="success-icon">✓</div>
+    <h1 style="margin-bottom: 8px">Verified!</h1>
+    <p class="subtitle" id="verifiedPhone" style="margin-bottom: 24px"></p>
+    <button class="btn-primary" onclick="reset()">Verify Another Number</button>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let currentPhone = '';
+let sessionId = '';
+let resendCooldown = 0;
+let cooldownTimer = null;
+
+function showAlert(type, msg) {
+  const el = document.getElementById('alert');
+  const icon = document.getElementById('alertIcon');
+  const msgEl = document.getElementById('alertMsg');
+  el.className = `alert show alert-${type}`;
+  icon.textContent = type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+  msgEl.textContent = msg;
+  if (type !== 'error') setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+function hideAlert() {
+  document.getElementById('alert').classList.remove('show');
+}
+
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (loading) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span> Please wait…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.orig || btn.innerHTML;
+  }
+}
+
+function setStep(n) {
+  document.getElementById('step1').classList.toggle('hidden', n !== 1);
+  document.getElementById('step2').classList.toggle('hidden', n !== 2);
+  document.getElementById('step3').classList.toggle('hidden', n !== 3);
+
+  document.getElementById('dot1').className = 'step-dot ' + (n >= 1 ? (n > 1 ? 'done' : 'active') : '');
+  document.getElementById('dot2').className = 'step-dot ' + (n >= 2 ? (n > 2 ? 'done' : 'active') : '');
+  document.getElementById('dot3').className = 'step-dot ' + (n >= 3 ? 'active done' : '');
+  document.getElementById('line1').className = 'step-line ' + (n > 1 ? 'done' : '');
+  document.getElementById('line2').className = 'step-line ' + (n > 2 ? 'done' : '');
+
+  hideAlert();
+}
+
+function startResendCooldown() {
+  resendCooldown = 30;
+  const link = document.getElementById('resendLink');
+  const timerEl = document.getElementById('resendTimer');
+  link.classList.add('disabled');
+
+  clearInterval(cooldownTimer);
+  cooldownTimer = setInterval(() => {
+    resendCooldown--;
+    timerEl.textContent = ` (${resendCooldown}s)`;
+    if (resendCooldown <= 0) {
+      clearInterval(cooldownTimer);
+      link.classList.remove('disabled');
+      timerEl.textContent = '';
+    }
+  }, 1000);
+}
+
+async function sendOTP() {
+  const raw = document.getElementById('phoneInput').value.replace(/[\s\-()]/g, '');
+  if (!raw || raw.length < 10) {
+    return showAlert('error', 'Enter a valid 10-digit phone number');
+  }
+  currentPhone = raw;
+
+  setLoading('sendBtn', true);
+  try {
+    const res = await fetch(`${API}/otp/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: currentPhone }),
+    });
+    const data = await res.json();
+
+    if (!data.success) throw new Error(data.error);
+
+    sessionId = data.session_id;
+    showAlert('success', `OTP sent to ${currentPhone}`);
+    setStep(2);
+    startResendCooldown();
+    document.getElementById('otpInput').focus();
+  } catch (err) {
+    showAlert('error', err.message || 'Failed to send OTP');
+  } finally {
+    setLoading('sendBtn', false);
+  }
+}
+
+async function verifyOTP() {
+  const code = document.getElementById('otpInput').value.trim();
+  if (!code || code.length < 4) {
+    return showAlert('error', 'Enter the OTP code');
+  }
+
+  setLoading('verifyBtn', true);
+  try {
+    const res = await fetch(`${API}/otp/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, otp: code }),
+    });
+    const data = await res.json();
+
+    if (!data.success || !data.valid) {
+      throw new Error(data.message || 'Invalid or expired OTP');
+    }
+
+    document.getElementById('verifiedPhone').textContent = `+91 ${currentPhone} is verified`;
+    setStep(3);
+  } catch (err) {
+    showAlert('error', err.message || 'Verification failed');
+  } finally {
+    setLoading('verifyBtn', false);
+  }
+}
+
+function goBack() {
+  setStep(1);
+  document.getElementById('otpInput').value = '';
+}
+
+function reset() {
+  document.getElementById('phoneInput').value = '';
+  document.getElementById('otpInput').value = '';
+  currentPhone = '';
+  sessionId = '';
+  setStep(1);
+}
+
+// Auto-format phone input
+document.getElementById('phoneInput').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/[^\d]/g, '');
+});
+
+// Auto-submit OTP on 6 digits
+document.getElementById('otpInput').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/[^\d]/g, '');
+  if (e.target.value.length === 6) verifyOTP();
+});
+
+// Enter key support
+document.getElementById('phoneInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendOTP();
+});
+document.getElementById('otpInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') verifyOTP();
+});
+</script>
+
+</body>
+</html>
