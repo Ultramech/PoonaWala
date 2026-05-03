@@ -3,6 +3,7 @@ GoldEye FastAPI — main entry point.
 Provides the stateless POST /api/assess endpoint plus session management.
 All signal workers run as async Celery tasks fanned out from /api/assess.
 """
+import os
 import uuid
 import time
 import logging
@@ -45,10 +46,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — tighten in production to your Cloudflare Pages domain
+# CORS — set ALLOWED_ORIGINS env var to a comma-separated list of origins in production
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+origins = [o.strip() for o in _raw_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
