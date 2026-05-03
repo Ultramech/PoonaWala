@@ -84,5 +84,12 @@ export default {
       },
     },
   },
+  safelist: [
+    'bg-poonawala-red',
+    'text-poonawala-red',
+    'border-poonawala-red',
+    'bg-poonawala-gold',
+    'text-poonawala-gold',
+  ],
   plugins: [],
 }
