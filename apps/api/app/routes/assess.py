@@ -2,287 +2,241 @@
 POST /api/assess — the stateless assessment endpoint.
 PWA is one client. WhatsApp will be another. This decoupling is
 a non-negotiable architectural rule (PRD §10, plan.md §2.2).
+
+Workers fan out in parallel via asyncio.gather; each catches its own errors
+so a single failed signal never blocks the session (PRD FR-ASS-02).
+
+Phase 5: adds S3 (colour), S4 (specular), S9 (reverse catalog), S12 (graph).
 """
 import uuid
 import time
+import json
 import hashlib
 import asyncio
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, Request, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.db.database import get_db
+from app.db.models import Session as SessionModel, AuditLog
 from app.models.schemas import (
     AssessRequest, AssessmentResult,
     ModelVersions, Purity, Weight, ValueINR,
     LoanOffer, Confidence, FraudSignals,
     ReasoningText, SHAPFeature, XAI, AuditTrail,
 )
+from app.workers.s1_huid import run as run_s1
+from app.workers.s2_hallmark import run as run_s2
+from app.workers.s3_color import run as run_s3
+from app.workers.s4_specular import run as run_s4
+from app.workers.s5_segmentation import run as run_s5
+from app.workers.s6_dimensions import run as run_s6
+from app.workers.s7_plated_solid import run as run_s7
+from app.workers.s8_vlm import run as run_s8
+from app.workers.s9_reverse_catalog import run as run_s9
+from app.workers.s10_telemetry import run as run_s10
+from app.workers.s11_audio import run as run_s11
+from app.workers.s12_graph import run as run_s12
+from app.workers.fusion import extract_features, fuse
+from app.xai.shap_explainer import explain
+from app.xai.text_generator import generate_reasoning, generate_counterfactual
+from app.xai.gradcam import generate_gradcam_url
+from app.decision.rules import apply_rbi_rules
+from app.decision.routing import route_session
+from app.decision.ibja import price_for_karat, price_metadata
+from app.limiter import limiter
 
 logger = logging.getLogger("goldeye.assess")
 router = APIRouter()
 
-# ─── Mock signal workers (Phase 2 replaces with real Celery tasks) ────────────
 
-async def _mock_s1_huid(frame_url: str) -> dict:
-    await asyncio.sleep(0.3)  # simulate I/O
-    return {
-        "signal_id": "s1_huid",
-        "confidence": 0.94,
-        "payload": {
-            "bis_logo_present": True,
-            "purity_mark": "22K916",
-            "huid_code": "A3F2K1",
-            "stamp_appearance": "laser_engraved",
-        },
-        "error": None,
-        "duration_ms": 312,
-        "model_version": "paddleocr-2.7+gd1.5",
-    }
-
-async def _mock_s5_s6_dimensions(frames: list[str], weight_g: float | None) -> dict:
-    await asyncio.sleep(0.8)
-    est = weight_g if weight_g else 7.9
-    return {
-        "signal_id": "s5_s6_dimensions",
-        "confidence": 0.78 if weight_g else 0.58,
-        "payload": {
-            "item_type": "bangle",
-            "estimated_weight_g": est,
-            "volume_cm3": est / 17.7,
-            "coin_detected": True,
-            "scale_mm_per_px": 0.11,
-        },
-        "error": None,
-        "duration_ms": 823,
-        "model_version": "sam2-hiera-tiny+depth-anything-v2-small",
-    }
-
-async def _mock_s7_plated_solid(frames: list[str]) -> dict:
-    await asyncio.sleep(0.5)
-    return {
-        "signal_id": "s7_plated_solid",
-        "confidence": 0.91,
-        "payload": {"solid_probability": 0.93, "plated_probability": 0.07},
-        "error": None,
-        "duration_ms": 498,
-        "model_version": "convnextv2-base-zero-shot",
-    }
-
-async def _mock_s8_vlm(frames: list[str]) -> dict:
-    await asyncio.sleep(1.2)
-    return {
-        "signal_id": "s8_vlm",
-        "confidence": 0.88,
-        "payload": {
-            "item_type": "bangle",
-            "estimated_karat_band": [20, 22],
-            "stones_present": False,
-            "stones_estimated_carat_total": 0.0,
-            "visible_wear": "low",
-            "concerns": [],
-        },
-        "error": None,
-        "duration_ms": 1247,
-        "model_version": "qwen2.5-vl-7b-zero-shot",
-    }
-
-async def _mock_s10_telemetry(metadata: dict | None) -> dict:
-    return {
-        "signal_id": "s10_telemetry",
-        "confidence": 0.95,
-        "payload": {"telemetry_anomaly_score": 0.03, "timestamp_delta_hours": 0.01},
-        "error": None,
-        "duration_ms": 12,
-        "model_version": "rule-based-v1",
-    }
-
-async def _mock_s11_audio(audio_url: str | None) -> dict:
-    if not audio_url:
-        return {
-            "signal_id": "s11_audio",
-            "confidence": 0.0,
-            "payload": {"skipped": True},
-            "error": "No audio provided",
-            "duration_ms": 0,
-            "model_version": "audio-cnn-v1",
-        }
-    await asyncio.sleep(0.4)
-    return {
-        "signal_id": "s11_audio",
-        "confidence": 0.87,
-        "payload": {"solid_probability": 0.89, "plated_probability": 0.11, "noise_probability": 0.0},
-        "error": None,
-        "duration_ms": 411,
-        "model_version": "audio-cnn-v1",
-    }
-
-
-# ─── Decision engine (Phase 4 replaces with full RBI rule engine) ─────────────
-
-def apply_rbi_rules(purity_karat: int, weight_g: float, value_inr: float) -> dict:
-    if weight_g > 1000:
-        return {"reject_reason": "exceeds_1kg_per_applicant"}
-
-    # RBI 2025: 85% LTV for loans <₹2.5L, 75% for above
-    ltv = 0.85 if value_inr * 0.75 < 250_000 else 0.75
-    loan_inr = value_inr * ltv
-    tier = "under_2_5L" if loan_inr < 250_000 else "above_2_5L"
-    return {
-        "ltv_pct": int(ltv * 100),
-        "loan_inr": loan_inr,
-        "tier": tier,
-        "reject_reason": None,
-    }
-
-
-def route_session(confidence: float, fraud_score: float, loan_inr: float, huid_verified: bool) -> str:
-    if fraud_score > 0.7:
-        return "REJECT"
-    if confidence < 0.4:
-        return "REJECT"
-    if confidence >= 0.85 and fraud_score < 0.05 and loan_inr < 50_000 and huid_verified:
-        return "INSTANT"
-    if confidence >= 0.6:
-        return "AGENT"
-    return "RECAPTURE"
-
-
-# ─── The stateless assess endpoint ────────────────────────────────────────────
+# ─── Assess endpoint ──────────────────────────────────────────────────────────
 
 @router.post("/assess", response_model=AssessmentResult)
-async def assess(req: AssessRequest, request: Request):
+@limiter.limit("10/minute")
+async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depends(get_db)):
     t_start = time.time()
     trace_id = getattr(request.state, "trace_id", str(uuid.uuid4()))
-
     logger.info(f"[{trace_id}] assess start session={req.session_id} frames={len(req.frames)}")
 
-    # Fan out all signal workers in parallel (graceful degradation: each catches its own errors)
-    results = await asyncio.gather(
-        _mock_s1_huid(req.frames[3] if len(req.frames) > 3 else req.frames[0]),
-        _mock_s5_s6_dimensions(req.frames, req.weight_g),
-        _mock_s7_plated_solid(req.frames),
-        _mock_s8_vlm(req.frames),
-        _mock_s10_telemetry(req.device_metadata),
-        _mock_s11_audio(req.audio),
+    macro_url = req.frames[3] if len(req.frames) > 3 else (req.frames[0] if req.frames else "")
+
+    # ── Phase 5: S1→S2 and S5→S6 mini-pipelines; S3/S4/S7/S8/S9/S10/S11/S12 independent ──
+    async def chain_huid_hallmark():
+        s1 = await run_s1(req.session_id, macro_url=macro_url)
+        s2 = await run_s2(req.session_id, s1_payload=s1.payload, macro_url=macro_url)
+        return s1, s2
+
+    async def chain_seg_dimensions():
+        s5 = await run_s5(req.session_id, frames=req.frames)
+        s6 = await run_s6(req.session_id, frames=req.frames, weight_g=req.weight_g,
+                          s5_payload=s5.payload)
+        return s5, s6
+
+    # Fan-out: all 12 signals in parallel (mini-chains preserve ordering within them)
+    (s1, s2), (s5, s6), s3, s4, s7, s8, s9, s10, s11 = await asyncio.gather(
+        chain_huid_hallmark(),
+        chain_seg_dimensions(),
+        run_s3(req.session_id, frames=req.frames),
+        run_s4(req.session_id, frames=req.frames),
+        run_s7(req.session_id, frames=req.frames),
+        run_s8(req.session_id, frames=req.frames),
+        run_s9(req.session_id, frames=req.frames),
+        run_s10(req.session_id, device_metadata=req.device_metadata),
+        run_s11(req.session_id, audio_url=req.audio),
         return_exceptions=False,
     )
 
-    s1, s56, s7, s8, s10, s11 = results
+    # S12 runs after S1 so it has the HUID code for graph lookup
+    huid_code_for_graph = s1.payload.get("huid_code") if not s1.error else None
+    s12 = await run_s12(req.session_id, frames=req.frames, huid_code=huid_code_for_graph)
 
-    # ── Fusion (simplified — Phase 3 replaces with LightGBM + MAPIE) ──────────
-    huid_verified    = s1["payload"].get("purity_mark") is not None
-    claimed_karat    = 22 if "22K" in str(s1["payload"].get("purity_mark", "")) else 18
-    est_weight       = s56["payload"]["estimated_weight_g"]
-    solid_prob       = s7["payload"]["solid_probability"]
-    audio_solid      = s11["payload"].get("solid_probability", 0.5) if not s11.get("error") else 0.5
-    vlm_karat_mid    = sum(s8["payload"].get("estimated_karat_band", [18, 22])) / 2
-    tele_anomaly     = s10["payload"]["telemetry_anomaly_score"]
+    # ── Phase 3+5: LightGBM + MAPIE fusion (19-feature vector) ────────────────
+    signals_dict = {
+        "s1": s1.payload, "s1_conf": s1.confidence,
+        "s2": s2.payload,
+        "s3": s3.payload if not s3.error else {}, "s3_conf": s3.confidence if not s3.error else 0.0,
+        "s4": s4.payload if not s4.error else {}, "s4_conf": s4.confidence if not s4.error else 0.0,
+        "s5": s5.payload,
+        "s6": s6.payload,
+        "s7": s7.payload,
+        "s8": s8.payload, "s8_conf": s8.confidence,
+        "s9": s9.payload if not s9.error else {}, "s9_conf": s9.confidence if not s9.error else 0.0,
+        "s10": s10.payload,
+        "s11": s11.payload if not s11.error else {}, "s11_conf": s11.confidence if not s11.error else 0.0,
+        "s12": s12.payload if not s12.error else {}, "s12_conf": s12.confidence if not s12.error else 0.0,
+    }
+    features = extract_features(signals_dict)
+    fused = fuse(features, manual_weight_g=req.weight_g)
 
-    # Purity fusion
-    point_karat = int(round((claimed_karat * 0.5 + vlm_karat_mid * 0.5) if not huid_verified else claimed_karat))
-    band_low_k  = max(14, point_karat - 2)
-    band_high_k = min(24, point_karat + 2)
+    huid_verified  = fused["huid_verified"]
+    point_karat    = fused["point_karat"]
+    band_low_k     = fused["karat_lo"]
+    band_high_k    = fused["karat_hi"]
+    final_weight   = fused["final_weight_g"]
+    weight_low     = fused["weight_lo_g"]
+    weight_high    = fused["weight_hi_g"]
+    value_inr      = fused["value_inr"]
+    value_low_inr  = fused["value_lo_inr"]
+    value_high_inr = fused["value_hi_inr"]
+    cal_method     = fused["calibration_method"]
 
-    # Weight
-    manual = req.weight_g
-    final_weight = (manual * 0.7 + est_weight * 0.3) if manual else est_weight
-    weight_band_low  = final_weight * 0.92
-    weight_band_high = final_weight * 1.10
-
-    # Value (IBJA mock at ₹7,200/g for 24K, May 2026)
-    gold_24k_per_g = 7200
-    purity_ratio   = point_karat / 24
-    value_per_g    = gold_24k_per_g * purity_ratio
-    value_inr      = final_weight * value_per_g
-    value_low      = weight_band_low  * value_per_g * (band_low_k / point_karat)
-    value_high     = weight_band_high * value_per_g * (band_high_k / point_karat)
+    # ── Phase 4: live IBJA price (falls back to ₹7,200/g mock) ──────────────
+    ibja_meta        = price_metadata()
+    live_value_per_g = price_for_karat(point_karat)
+    live_value_inr   = final_weight   * live_value_per_g
+    live_value_lo    = weight_low     * price_for_karat(band_low_k)
+    live_value_hi    = weight_high    * price_for_karat(band_high_k)
+    # Use live prices if they look reasonable (not zero), else keep fused values
+    if live_value_inr > 0:
+        value_inr, value_low_inr, value_high_inr = live_value_inr, live_value_lo, live_value_hi
 
     # RBI hard rules
     rbi = apply_rbi_rules(point_karat, final_weight, value_inr)
 
-    # Fraud score
-    fraud_score = (1 - solid_prob) * 0.4 + (1 - audio_solid) * 0.2 + tele_anomaly * 0.3
-    fraud_score = min(1.0, max(0.0, fraud_score))
-    fraud_triggers = []
-    if solid_prob < 0.5: fraud_triggers.append("plated_metal_suspected")
-    if audio_solid < 0.5 and not s11.get("error"): fraud_triggers.append("acoustic_inconsistent")
+    # Fraud score — now incorporates all 4 fraud-relevant signals
+    solid_prob    = features["solid_probability_s7"]
+    audio_solid   = features["audio_solid_probability"]
+    tele_anomaly  = features["telemetry_anomaly_score"]
+    catalog_match = features["catalog_match_score"]          # S9
+    graph_anomaly = features["graph_anomaly_score"]          # S12
+    specular_score = features["specular_metal_score"]        # S4 (low = non-gold)
 
-    # Confidence
-    signal_confs = [s["confidence"] for s in [s1, s56, s7, s8, s10] if not s.get("error")]
-    base_conf = sum(signal_confs) / len(signal_confs) if signal_confs else 0.5
+    fraud_score = min(1.0, max(0.0,
+        (1 - solid_prob)   * 0.25
+        + (1 - audio_solid) * 0.15
+        + tele_anomaly      * 0.20
+        + catalog_match     * 0.25     # strong: catalog match = likely stock-photo fraud
+        + graph_anomaly     * 0.15     # HUID/photo reuse
+    ))
+    fraud_triggers = []
+    if solid_prob < 0.5:    fraud_triggers.append("plated_metal_suspected")
+    if audio_solid < 0.5 and not s11.error: fraud_triggers.append("acoustic_inconsistent")
+    if specular_score < 0.35: fraud_triggers.append("non_gold_specular_signature")
+    if catalog_match >= 0.85: fraud_triggers.append("catalog_stock_photo_match")
+    if graph_anomaly >= 0.4:  fraud_triggers.append("cross_session_reuse_detected")
+
+    # Confidence: weighted average of active signals (all 12 now), penalised by fraud
+    active = [s for s in [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10] if not s.error]
+    base_conf  = sum(s.confidence for s in active) / len(active) if active else 0.5
     confidence = max(0.0, min(1.0, base_conf - fraud_score * 0.3))
 
-    # Routing
-    loan_inr = rbi["loan_inr"]
-    routing = route_session(confidence, fraud_score, loan_inr, huid_verified)
+    routing = route_session(confidence, fraud_score, rbi["loan_inr"], huid_verified,
+                            rbi_reject_reason=rbi.get("reject_reason"))
 
-    # SHAP (simplified approximation — Phase 3 adds real SHAP)
-    shap_features = [
-        SHAPFeature(feature="huid_verified",    contribution= 0.31 if huid_verified else -0.25),
-        SHAPFeature(feature="plated_solid_score",contribution= (solid_prob - 0.5) * 0.5),
-        SHAPFeature(feature="weight_consistency",contribution= 0.18 if manual else 0.05),
-        SHAPFeature(feature="audio_solid_prob",  contribution= (audio_solid - 0.5) * 0.3),
-        SHAPFeature(feature="vlm_confidence",    contribution= (s8["confidence"] - 0.5) * 0.25),
-    ]
+    # ── Phase 3: XAI ─────────────────────────────────────────────────────────
+    shap_data = explain(features)
+    shap_features = [SHAPFeature(feature=d["feature"], contribution=d["contribution"]) for d in shap_data]
 
-    # Reasoning text
-    if routing == "INSTANT":
-        reasoning = "✓ BIS hallmark verified  ✓ Weight consistent  ✓ No fraud signals  ✓ Acoustic: solid gold"
-    elif routing in ("REJECT", "RECAPTURE"):
-        reasoning = f"Confidence {int(confidence*100)}% — insufficient for pre-approval. Recommend in-branch verification."
-    else:
-        reasoning = f"Confidence {int(confidence*100)}% — meets most criteria but physical verification recommended."
+    reasoning    = generate_reasoning(routing, confidence, lang=req.lang)
+    counterfactual = generate_counterfactual(routing, huid_verified, confidence, lang=req.lang)
+    gradcam_url  = await generate_gradcam_url(macro_url, req.session_id)
 
-    counterfactual = None
-    if routing in ("AGENT", "RECAPTURE") and not huid_verified:
-        counterfactual = "If the BIS hallmark were verified, confidence would increase by ~15–20%."
-
-    # Asset hashes (mock)
     asset_hashes = [hashlib.sha256(url.encode()).hexdigest()[:16] for url in req.frames]
+    elapsed_ms   = int((time.time() - t_start) * 1000)
+    logger.info(f"[{trace_id}] assess done routing={routing} confidence={confidence:.2f} "
+                f"calibration={cal_method} elapsed={elapsed_ms}ms")
 
-    elapsed_ms = int((time.time() - t_start) * 1000)
-    logger.info(f"[{trace_id}] assess done routing={routing} confidence={confidence:.2f} elapsed={elapsed_ms}ms")
-
-    return AssessmentResult(
+    result = AssessmentResult(
         session_id=req.session_id,
         timestamp_utc=datetime.now(timezone.utc),
         model_versions=ModelVersions(),
         purity=Purity(
-            band_low_karat=band_low_k,
-            band_high_karat=band_high_k,
-            point_estimate_karat=point_karat,
-            huid_verified=huid_verified,
+            band_low_karat=band_low_k, band_high_karat=band_high_k,
+            point_estimate_karat=point_karat, huid_verified=huid_verified,
         ),
         weight=Weight(
-            manual_entry_g=manual,
-            estimated_g=round(final_weight, 2),
-            band_low_g=round(weight_band_low, 2),
-            band_high_g=round(weight_band_high, 2),
-            method="hybrid" if manual else "depth_volume_x_density",
+            manual_entry_g=req.weight_g, estimated_g=final_weight,
+            band_low_g=weight_low, band_high_g=weight_high,
+            method="hybrid" if req.weight_g else "depth_volume_x_density",
         ),
         value_inr=ValueINR(
-            band_low=int(value_low),
-            band_high=int(value_high),
+            band_low=int(value_low_inr), band_high=int(value_high_inr),
             ibja_reference_date=datetime.now(timezone.utc),
-            stone_weight_excluded_g=0.0,
+            stone_weight_excluded_g=s8.payload.get("stones_estimated_carat_total", 0.0),
         ),
         loan_offer=LoanOffer(
-            band_low_inr=int(value_low * rbi["ltv_pct"] / 100),
-            band_high_inr=int(value_high * rbi["ltv_pct"] / 100),
+            band_low_inr=int(value_low_inr  * rbi["ltv_pct"] / 100),
+            band_high_inr=int(value_high_inr * rbi["ltv_pct"] / 100),
             ltv_applied_pct=rbi["ltv_pct"],
             tier=rbi["tier"],
         ),
         confidence=Confidence(
             score=round(confidence, 3),
             coverage_guarantee_pct=90,
-            calibration_method="none",   # "split_conformal" in Phase 3
+            calibration_method=cal_method,
         ),
         fraud_signals=FraudSignals(score=round(fraud_score, 3), triggers=fraud_triggers),
         routing=routing,
         reasoning_text=ReasoningText(lang=req.lang, text=reasoning),
         xai=XAI(
-            gradcam_url=None,
+            gradcam_url=gradcam_url,
             shap_top_features=shap_features,
             counterfactual=counterfactual,
         ),
         audit=AuditTrail(trace_id=trace_id, input_asset_hashes=asset_hashes),
+        conformal_width_karat=float(band_high_k - band_low_k),
     )
+
+    # Persist: upsert session record + write immutable audit log
+    try:
+        existing = await db.execute(select(SessionModel).where(SessionModel.id == req.session_id))
+        session_row = existing.scalar_one_or_none()
+        if not session_row:
+            session_row = SessionModel(id=req.session_id, lang=req.lang, status="completed")
+            db.add(session_row)
+        else:
+            session_row.status = "completed"
+        audit_log = AuditLog(
+            trace_id=trace_id,
+            session_id=req.session_id,
+            event_type="assessment_complete",
+            payload=result.model_dump_json(),
+        )
+        db.add(audit_log)
+        await db.commit()
+    except Exception as e:
+        logger.warning(f"[{trace_id}] audit log write failed (non-fatal): {e}")
+
+    return result

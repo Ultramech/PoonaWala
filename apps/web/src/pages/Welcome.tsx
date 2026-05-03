@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Shield, Zap, TrendingUp, ChevronRight } from 'lucide-react'
+import { DemoQR } from '../components/DemoQR'
 
 const STATS = [
   { valKey: 'welcome_stat1_val', labelKey: 'welcome_stat1_label' },
@@ -20,6 +21,7 @@ export function Welcome() {
 
   return (
     <div className="page overflow-y-auto no-scrollbar animate-fade-in">
+      <DemoQR />
       {/* Hero */}
       <div className="relative px-5 pt-12 pb-8 overflow-hidden">
         {/* Background glow */}

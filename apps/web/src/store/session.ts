@@ -125,6 +125,7 @@ export function useSessionStore() {
     },
     setWeight: (g: number | null) => setState({ weightG: g }),
     setResult: (result: AssessmentResult) => setState({ result }),
+    setSessionId: (id: string) => setState({ sessionId: id }),
     initSession: () => {
       const id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
       setState({ sessionId: id })

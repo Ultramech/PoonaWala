@@ -45,6 +45,11 @@ export default defineConfig({
     host: true,
     port: 5173,
     https: false, // Use Cloudflare tunnel or ngrok for HTTPS in dev
+    proxy: {
+      '/api':     { target: 'http://localhost:8000', changeOrigin: true },
+      '/session': { target: 'http://localhost:8000', changeOrigin: true },
+      '/health':  { target: 'http://localhost:8000', changeOrigin: true },
+    },
   },
   build: {
     target: 'es2020',

@@ -10,9 +10,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
 
+from app.limiter import limiter
 from app.routes.session import router as session_router
 from app.routes.assess import router as assess_router
+from app.routes.dashboard import router as dashboard_router
+from app.decision.ibja import price_metadata, current_price_24k, _refresh_async
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("goldeye")
@@ -21,6 +27,7 @@ logger = logging.getLogger("goldeye")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("GoldEye API starting up…")
+    await _refresh_async()   # prime IBJA price cache on startup
     yield
     logger.info("GoldEye API shutting down.")
 
@@ -43,6 +50,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Prometheus metrics setup
+Instrumentator().instrument(app).expose(app)
+
 
 # ─── Request-ID middleware ─────────────────────────────────────────────────────
 @app.middleware("http")
@@ -59,8 +72,63 @@ async def add_trace_id(request: Request, call_next):
 # ─── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(session_router, prefix="/session", tags=["Session"])
 app.include_router(assess_router, prefix="/api", tags=["Assessment"])
+app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 
 
 @app.get("/health", tags=["Infra"])
 async def health():
-    return {"status": "ok", "service": "goldeye-api", "version": "0.1.0"}
+    ibja = price_metadata()
+    return {
+        "status": "ok",
+        "service": "goldeye-api",
+        "version": "0.1.0",
+        "ibja_price_per_g_24k": ibja["price_24k_per_g"],
+        "ibja_source": ibja["source"],
+        "ibja_age_s": ibja["age_s"],
+    }
+
+
+@app.get("/api/price", tags=["Assessment"])
+async def gold_price():
+    """Current IBJA gold price used in assessments. Cached; refreshes hourly."""
+    current_price_24k()   # trigger refresh if cache is stale
+    return price_metadata()
+
+
+@app.get("/api/health/models", tags=["Infra"])
+async def model_health():
+    """Returns loaded state of each ONNX/ML model."""
+    # Import module-level session objects — do not reload
+    from app.ml import audio as audio_mod
+    from app.ml import convnext as convnext_mod
+
+    # Trigger lazy loads if not yet done
+    audio_mod._load_audio_onnx()
+    convnext_mod._load_session()
+
+    # Fusion models
+    fusion_lgbm_loaded = False
+    fusion_mapie_loaded = False
+    try:
+        from app.workers.fusion import _lgbm_model, _mapie_model
+        fusion_lgbm_loaded = _lgbm_model is not None
+        fusion_mapie_loaded = _mapie_model is not None
+    except (ImportError, AttributeError):
+        pass
+
+    # Catalog pHashes count
+    catalog_count = 0
+    try:
+        from app.workers.s9_reverse_catalog import _catalog_hashes, _load_catalog
+        _load_catalog()
+        catalog_count = int(len(_catalog_hashes))
+    except (ImportError, AttributeError):
+        pass
+
+    return {
+        "fusion_lgbm": fusion_lgbm_loaded,
+        "fusion_mapie": fusion_mapie_loaded,
+        "convnext_solid": convnext_mod._session is not None,
+        "audio_cnn": audio_mod._ONNX_SESSION is not None,
+        "catalog_phashes_count": catalog_count,
+    }
