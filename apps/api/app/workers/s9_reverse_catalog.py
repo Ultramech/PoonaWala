@@ -1,3 +1,4 @@
+from typing import Optional, Union
 """
 S9 — Reverse-catalog fraud defense signal worker.
 
@@ -21,8 +22,8 @@ import logging
 import numpy as np
 
 from app.models.schemas import SignalResult
-from app.ml.phash import compute_phash, hamming_distance, phash_to_hex
-from app.ml.image_utils import fetch_image_bytes
+from app.data.phash import compute_phash, hamming_distance, phash_to_hex
+from app.data.image_utils import fetch_image_bytes
 
 logger = logging.getLogger("goldeye.workers.s9_reverse_catalog")
 
@@ -68,7 +69,7 @@ async def run(session_id: str, frames: list[str]) -> SignalResult:
 
         session_hashes: list[int] = []
         best_match_score = 0.0       # 0 = no match, 1 = exact catalog hit
-        best_match_hash_hex: str | None = None
+        best_match_hash_hex: Optional[str] = None
 
         for idx, url in enumerate(frames[:4]):   # check all 4 still photos
             if not url or url.startswith("local://"):

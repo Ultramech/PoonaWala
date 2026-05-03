@@ -1,23 +1,13 @@
 """
-S3 — CIELAB colour analysis signal worker.
-
-Pipeline:
-  1. Fetch the top-down frame (frames[0]) and, if available, the 45° frame.
-  2. White-balance each frame using the ₹10 coin's neutral gray
-     (coin L*≈72 acts as a grey-card reference).
-  3. Run CIELAB analysis on the white-balanced image → karat probability vector.
-  4. Aggregate across frames (weighted by per-frame confidence).
-  5. Return the best-karat estimate, the full probability vector, and confidence.
-
-PRD references: S3 signal, Phase 5 (§10.1 of implementation_plan.md).
+S3 — Gemini API color/purity analysis signal worker.
+Uses Google Gemini 2.0 Flash to estimate gold karat purity from jewelry images.
 """
 import time
 import logging
-from typing import Any
 
 from app.models.schemas import SignalResult
-from app.ml.color import analyze_color, white_balance_coin
-from app.ml.image_utils import fetch_image_bytes
+from app.data.image_utils import fetch_image_bytes
+from app.data.gemini import analyze_image_fallback
 
 logger = logging.getLogger("goldeye.workers.s3_color")
 
@@ -26,91 +16,80 @@ async def run(session_id: str, frames: list[str]) -> SignalResult:
     """
     Args:
         session_id: for logging / tracing.
-        frames: list of image URLs or base64 data-URIs (same as AssessRequest.frames).
-                Only the first two (top-down + 45°) are used.
+        frames: list of image URLs or base64 data-URIs.
+                Uses the first non-stub frame for Gemini analysis.
     """
     t0 = time.time()
     try:
-        import cv2
-        import numpy as np
+        import base64
 
-        results: list[dict] = []
+        # Find first real frame
+        real_frame = None
+        for url in frames:
+            if url and not url.startswith("local://"):
+                real_frame = url
+                break
 
-        # Use top-down (0) and 45-degree (1) frames; macro (3) is too zoomed for colour
-        candidate_indices = [0, 1]
-        for idx in candidate_indices:
-            if idx >= len(frames):
-                continue
-            url = frames[idx]
-            if not url or url.startswith("local://"):
-                continue
-
-            raw = await fetch_image_bytes(url)
-            if raw is None:
-                continue
-
-            arr = np.frombuffer(raw, dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if img is None:
-                continue
-
-            # White-balance correction using coin as grey reference
-            balanced = white_balance_coin(img)
-            if balanced is None:
-                balanced = img  # fallback: no correction
-
-            analysis = analyze_color(balanced)
-            if "error" not in analysis and analysis.get("color_confidence", 0) > 0.05:
-                results.append(analysis)
-
-        if not results:
+        if not real_frame:
             return SignalResult(
                 signal_id="s3_color",
                 confidence=0.0,
-                payload={"reason": "no_usable_frames", "karat_probabilities": {}},
-                error="no_usable_frames",
+                payload={"reason": "no_real_frames", "karat_probabilities": {}},
+                error="no_real_frames",
                 duration_ms=int((time.time() - t0) * 1000),
-                model_version="cielab-heuristic-v1",
+                model_version="gemini-color-v1",
             )
 
-        # Weighted aggregate: weight by color_confidence
-        total_weight = sum(r["color_confidence"] for r in results)
-        if total_weight == 0:
-            total_weight = len(results)
+        # Fetch and encode image
+        raw = await fetch_image_bytes(real_frame)
+        if raw is None:
+            return SignalResult(
+                signal_id="s3_color",
+                confidence=0.0,
+                payload={"reason": "fetch_failed", "karat_probabilities": {}},
+                error="fetch_failed",
+                duration_ms=int((time.time() - t0) * 1000),
+                model_version="gemini-color-v1",
+            )
 
-        # Merge karat probability vectors
-        all_keys = set()
-        for r in results:
-            all_keys.update(r.get("karat_probabilities", {}).keys())
+        img_b64 = base64.b64encode(raw).decode('utf-8')
 
-        merged_probs: dict[str, float] = {}
-        for k in all_keys:
-            merged_probs[k] = sum(
-                r.get("karat_probabilities", {}).get(k, 0.0) * r["color_confidence"]
-                for r in results
-            ) / total_weight
+        # Use Gemini to analyze purity
+        result = await analyze_image_fallback(
+            image_base64=img_b64,
+            analysis_type="purity"
+        )
 
-        best_karat = max(merged_probs, key=lambda x: merged_probs[x]) if merged_probs else "22K"
-        # Convert "22K" → 22, "plated" → 0
-        from app.ml.color import KARAT_VALUES
-        best_karat_int = KARAT_VALUES.get(best_karat, 18)
+        if result.get("error"):
+            return SignalResult(
+                signal_id="s3_color",
+                confidence=0.0,
+                payload={"reason": result.get("error"), "karat_probabilities": {}},
+                error=result.get("error"),
+                duration_ms=int((time.time() - t0) * 1000),
+                model_version="gemini-color-v1",
+            )
 
-        mean_confidence = total_weight / len(results)
-        aggregate_confidence = float(np.clip(mean_confidence, 0.0, 1.0))
+        # Extract karat estimate
+        estimated_karat = result.get("estimated_karat", 22)
+        confidence = result.get("confidence", 0.5)
+        karat_str = f"{estimated_karat}K"
 
         return SignalResult(
             signal_id="s3_color",
-            confidence=round(aggregate_confidence, 3),
+            confidence=round(confidence, 3),
             payload={
-                "best_karat": best_karat,
-                "best_karat_int": best_karat_int,
-                "karat_probabilities": {k: round(v, 4) for k, v in merged_probs.items()},
-                "frames_analyzed": len(results),
-                "mean_lab": results[0].get("mean_lab", []),
+                "best_karat": karat_str,
+                "best_karat_int": estimated_karat,
+                "karat_probabilities": {karat_str: 1.0},
+                "frames_analyzed": 1,
+                "method": "gemini_purity_analysis",
+                "color_analysis": result.get("color_analysis", ""),
+                "hallmark_visible": result.get("hallmark_visible", False),
             },
             error=None,
             duration_ms=int((time.time() - t0) * 1000),
-            model_version="cielab-heuristic-v1",
+            model_version="gemini-color-v1",
         )
 
     except Exception as exc:
@@ -121,5 +100,5 @@ async def run(session_id: str, frames: list[str]) -> SignalResult:
             payload={},
             error=str(exc),
             duration_ms=int((time.time() - t0) * 1000),
-            model_version="cielab-heuristic-v1",
+            model_version="gemini-color-v1",
         )

@@ -5,8 +5,9 @@ Phase 3: add forgery classifier (printed sticker vs. genuine stamp).
 """
 import time
 import logging
+from typing import Optional
 from app.models.schemas import SignalResult
-from app.ml.vlm import call_vlm
+from app.data.vlm import call_vlm
 
 logger = logging.getLogger("goldeye.workers.s2")
 
@@ -27,7 +28,7 @@ _APPEARANCE_SCORES = {
 }
 
 
-async def run(session_id: str, s1_payload: dict | None = None, macro_url: str = "", **_) -> SignalResult:
+async def run(session_id: str, s1_payload: Optional[dict] = None, macro_url: str = "", **_) -> SignalResult:
     t0 = time.time()
     try:
         appearance = (s1_payload or {}).get("stamp_appearance", "unclear")

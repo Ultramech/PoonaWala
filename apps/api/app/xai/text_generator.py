@@ -1,8 +1,9 @@
+from __future__ import annotations
 """
 Layer 3 XAI: template-based reasoning text in English and Hindi.
 PRD FR-OUT-02. Two languages at MVP; extend to 12 at pilot (Phase 8).
 """
-from __future__ import annotations
+from typing import Optional, Union
 
 _TEMPLATES: dict[str, dict[str, str]] = {
     "en": {

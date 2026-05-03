@@ -15,7 +15,7 @@ class TestS3Color:
 
     def test_analyze_color_returns_probs(self):
         """analyze_color returns a karat probability vector that sums to ~1."""
-        from app.ml.color import analyze_color
+        from app.data.color import analyze_color
         import cv2
 
         # Create a synthetic image with mid-range Lab values that fall in the metal mask:
@@ -39,7 +39,7 @@ class TestS3Color:
 
     def test_analyze_color_insufficient_metal(self):
         """All-white image → insufficient metal pixels error."""
-        from app.ml.color import analyze_color
+        from app.data.color import analyze_color
         import cv2
 
         img = np.full((50, 50, 3), 255, dtype=np.uint8)
@@ -48,7 +48,7 @@ class TestS3Color:
 
     def test_white_balance_coin_returns_image_or_none(self):
         """white_balance_coin: returns ndarray or None, never raises."""
-        from app.ml.color import white_balance_coin
+        from app.data.color import white_balance_coin
         import cv2
 
         img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -82,7 +82,7 @@ class TestS4Specular:
 
     def test_analyze_specular_gold_like(self):
         """Frame with warm bright highlights → metal_score > 0.3."""
-        from app.ml.specular import analyze_specular
+        from app.data.specular import analyze_specular
         import cv2
 
         # Warm highlight: HSV hue ~20°, high saturation, high brightness
@@ -97,7 +97,7 @@ class TestS4Specular:
 
     def test_analyze_specular_no_highlights(self):
         """Dark image with no highlights → returns metal_score 0.5 (neutral)."""
-        from app.ml.specular import analyze_specular
+        from app.data.specular import analyze_specular
 
         img = np.full((50, 50, 3), 10, dtype=np.uint8)  # very dark
         result = analyze_specular(img)
@@ -105,7 +105,7 @@ class TestS4Specular:
 
     def test_analyze_specular_multi_aggregates(self):
         """multi-frame aggregation returns averaged score."""
-        from app.ml.specular import analyze_specular_multi
+        from app.data.specular import analyze_specular_multi
         import cv2
 
         imgs = []
@@ -141,7 +141,7 @@ class TestS9Catalog:
 
     def test_phash_compute_and_compare(self):
         """pHash of identical images → Hamming distance 0."""
-        from app.ml.phash import compute_phash, hamming_distance, is_duplicate
+        from app.data.phash import compute_phash, hamming_distance, is_duplicate
 
         img = np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
         h1 = compute_phash(img)
@@ -152,7 +152,7 @@ class TestS9Catalog:
 
     def test_phash_different_images(self):
         """pHash of very different natural images → Hamming distance > 0."""
-        from app.ml.phash import compute_phash, hamming_distance, is_duplicate
+        from app.data.phash import compute_phash, hamming_distance, is_duplicate
 
         # Use gradient images (non-uniform → non-trivial DCT coefficients)
         img1 = np.tile(

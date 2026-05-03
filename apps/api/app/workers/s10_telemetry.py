@@ -1,3 +1,4 @@
+from typing import Optional, Union
 """
 S10 — EXIF + device telemetry anti-fraud signal.
 Checks: timestamp delta (session vs. EXIF), camera fingerprint consistency,
@@ -8,7 +9,7 @@ from datetime import datetime, timezone
 from app.models.schemas import SignalResult
 
 
-async def run(session_id: str, device_metadata: dict | None = None, **_) -> SignalResult:
+async def run(session_id: str, device_metadata: Optional[dict] = None, **_) -> SignalResult:
     t0 = time.time()
     meta = device_metadata or {}
     try:
