@@ -77,19 +77,20 @@ class AssessmentResult(BaseModel):
     reasoning_text: ReasoningText
     xai: XAI
     audit: AuditTrail
+    conformal_width_karat: float = 4.0  # karat_hi - karat_lo; drives active-learning queue
 
 
 # ─── Assess request ────────────────────────────────────────────────────────────
 
 class AssessRequest(BaseModel):
-    session_id: str
-    frames: list[str]              # Signed R2/MinIO URLs
+    session_id: str = Field(..., min_length=1)
+    frames: list[str] = Field(..., min_length=1, max_length=10)  # Signed R2/MinIO URLs
     video: Optional[str] = None
     audio: Optional[str] = None
     selfie: Optional[str] = None
-    weight_g: Optional[float] = None
-    reference_object: str = "rs10_coin"
-    lang: str = "en"
+    weight_g: Optional[float] = Field(None, gt=0, lt=5000)
+    reference_object: str = Field("rs10_coin", min_length=1)
+    lang: str = Field("en", min_length=2, max_length=10)
     device_metadata: Optional[dict] = None
 
 

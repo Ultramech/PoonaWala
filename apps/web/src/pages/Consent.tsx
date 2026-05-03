@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useSessionStore } from '../store/session'
+import { initSessionAPI, recordConsentAPI } from '../lib/api'
 import { Shield, Lock, Trash2, Eye, ChevronRight } from 'lucide-react'
 
 const DATA_ITEMS = [
@@ -13,11 +15,23 @@ const DATA_ITEMS = [
 export function Consent() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { setConsent, initSession } = useSessionStore()
+  const { setConsent, initSession, setSessionId } = useSessionStore()
+  const [loading, setLoading] = useState(false)
 
-  const accept = () => {
+  const accept = async () => {
+    setLoading(true)
+    const lang = localStorage.getItem('goldeye_lang') ?? 'en'
+    try {
+      const { session_id } = await initSessionAPI(lang)
+      setSessionId(session_id)
+      await recordConsentAPI(session_id).catch(() => {}) // non-blocking
+    } catch {
+      // API unavailable — fall back to local session ID for demo
+      initSession()
+    } finally {
+      setLoading(false)
+    }
     setConsent()
-    initSession()
     navigate('/otp')
   }
 
@@ -93,8 +107,8 @@ export function Consent() {
 
       {/* Actions - sticky bottom */}
       <div className="px-5 pb-6 space-y-3 border-t border-white/5 pt-4">
-        <button id="consent-accept" onClick={accept} className="btn-gold w-full">
-          {t('consent_accept')}
+        <button id="consent-accept" onClick={accept} disabled={loading} className="btn-gold w-full">
+          {loading ? t('loading') : t('consent_accept')}
         </button>
         <button id="consent-decline" onClick={decline} className="btn-ghost w-full text-sm">
           {t('consent_decline')}
