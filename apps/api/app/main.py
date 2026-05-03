@@ -7,6 +7,8 @@ import uuid
 import time
 import logging
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,6 +20,8 @@ from app.limiter import limiter
 from app.routes.session import router as session_router
 from app.routes.assess import router as assess_router
 from app.routes.dashboard import router as dashboard_router
+from app.routes.frame_eval import router as frame_eval_router
+from app.routes.otp import router as otp_router
 from app.decision.ibja import price_metadata, current_price_24k, _refresh_async
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -73,6 +77,8 @@ async def add_trace_id(request: Request, call_next):
 app.include_router(session_router, prefix="/session", tags=["Session"])
 app.include_router(assess_router, prefix="/api", tags=["Assessment"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(frame_eval_router, tags=["FrameEval"])
+app.include_router(otp_router, tags=["OTP"])
 
 
 @app.get("/health", tags=["Infra"])
@@ -99,8 +105,8 @@ async def gold_price():
 async def model_health():
     """Returns loaded state of each ONNX/ML model."""
     # Import module-level session objects — do not reload
-    from app.ml import audio as audio_mod
-    from app.ml import convnext as convnext_mod
+    from app.data import audio as audio_mod
+    from app.data import convnext as convnext_mod
 
     # Trigger lazy loads if not yet done
     audio_mod._load_audio_onnx()

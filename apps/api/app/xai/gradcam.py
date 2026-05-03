@@ -26,8 +26,8 @@ async def generate_gradcam_url(
 
     try:
         import cv2
-        from app.ml.image_utils import fetch_image_bytes
-        from app.ml.convnext import score_cam_lite
+        from app.data.image_utils import fetch_image_bytes
+        from app.data.convnext import score_cam_lite
 
         raw = await fetch_image_bytes(frame_url)
         if raw is None:

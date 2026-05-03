@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 from app.models.schemas import SignalResult
-from app.ml.image_utils import fetch_image_bytes
+from app.data.image_utils import fetch_image_bytes
 
 logger = logging.getLogger("goldeye.workers.s1")
 
@@ -61,7 +61,7 @@ async def run(session_id: str, macro_url: str = "", **_) -> SignalResult:
 
     # ── Real frame → fetch + local OpenCV analysis ────────────────────────────
     try:
-        from app.ml.huid_detector import analyze_hallmark
+        from app.data.huid_detector import analyze_hallmark
 
         raw = await fetch_image_bytes(macro_url)
         if raw is None:
@@ -96,7 +96,7 @@ async def run(session_id: str, macro_url: str = "", **_) -> SignalResult:
         # ── Production VLM blend (only when non-localhost VLM configured) ────
         if _IS_PRODUCTION_VLM:
             try:
-                from app.ml.vlm import call_vlm
+                from app.data.vlm import call_vlm
                 vlm_result = await call_vlm(_VLM_PROMPT, [macro_url])
                 vlm_conf = float(vlm_result.get("ocr_confidence", confidence))
                 # Blend local (40%) + VLM (60%)
