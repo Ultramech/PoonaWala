@@ -27,6 +27,10 @@ export default {
           3:   '#242424',
           4:   '#2E2E2E',
         },
+        poonawala: {
+          red: '#e31d25',
+          gold: '#D4A017',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -49,9 +53,9 @@ export default {
         slideUp:    { from: { opacity: '0', transform: 'translateY(24px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         slideDown:  { from: { opacity: '0', transform: 'translateY(-16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         scaleIn:    { from: { opacity: '0', transform: 'scale(0.92)' }, to: { opacity: '1', transform: 'scale(1)' } },
-        pulseGold:  { '0%,100%': { boxShadow: '0 0 0 0 rgba(212,160,23,0.4)' }, '50%': { boxShadow: '0 0 0 12px rgba(212,160,23,0)' } },
+        pulseGold:  { '0%,100%': { boxShadow: '0 0 0 0 rgba(227,29,37,0.4)' }, '50%': { boxShadow: '0 0 0 12px rgba(227,29,37,0)' } },
         shimmer:    { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
-        glow:       { from: { textShadow: '0 0 4px rgba(212,160,23,0.5)' }, to: { textShadow: '0 0 16px rgba(212,160,23,0.9), 0 0 32px rgba(212,160,23,0.4)' } },
+        glow:       { from: { textShadow: '0 0 4px rgba(227,29,37,0.5)' }, to: { textShadow: '0 0 16px rgba(227,29,37,0.9), 0 0 32px rgba(227,29,37,0.4)' } },
         bandDraw:   { from: { transform: 'scaleX(0)', transformOrigin: 'left' }, to: { transform: 'scaleX(1)', transformOrigin: 'left' } },
       },
       backgroundImage: {
@@ -62,9 +66,9 @@ export default {
       },
       backdropBlur: { xs: '2px' },
       boxShadow: {
-        'gold-sm':  '0 0 0 1px rgba(212,160,23,0.3)',
-        'gold':     '0 0 0 1px rgba(212,160,23,0.5), 0 4px 24px rgba(212,160,23,0.15)',
-        'gold-lg':  '0 0 0 1px rgba(212,160,23,0.6), 0 8px 40px rgba(212,160,23,0.25)',
+        'gold-sm':  '0 0 0 1px rgba(227,29,37,0.3)',
+        'gold':     '0 0 0 1px rgba(227,29,37,0.5), 0 4px 24px rgba(227,29,37,0.15)',
+        'gold-lg':  '0 0 0 1px rgba(227,29,37,0.6), 0 8px 40px rgba(227,29,37,0.25)',
         'card':     '0 1px 3px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.3)',
         'card-hover':'0 2px 8px rgba(0,0,0,0.6), 0 16px 40px rgba(0,0,0,0.4)',
         'glow-red': '0 0 0 1px rgba(239,68,68,0.4), 0 4px 24px rgba(239,68,68,0.15)',
