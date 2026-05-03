@@ -3,6 +3,12 @@ node_modules
 *.pyc
 __pycache__
 .venv
+venv*/
+*.onnx
+*.onnx.data
+*.pkl
+*.npy
+ml/models/
 ml/models/*.bin
 ml/models/*.pt
 .DS_Store

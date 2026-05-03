@@ -2,6 +2,8 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { clsx } from 'clsx'
 import type { CaptureType } from '../store/session'
 
+type MotionSample = { x: number; y: number; z: number; t: number }
+
 export interface QualityResult {
   ok: boolean
   reasons: string[]
@@ -57,7 +59,7 @@ function quickQualityCheck(canvas: HTMLCanvasElement): QualityResult {
 
 interface CameraProps {
   type: CaptureType
-  onCapture: (blob: Blob, dataUrl: string) => void
+  onCapture: (blob: Blob, dataUrl: string, exif?: Record<string, unknown>) => void
   onError?: (err: string) => void
   facingMode?: 'environment' | 'user'
   isVideo?: boolean
@@ -70,6 +72,7 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
   const mediaRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const gyroRef = useRef<MotionSample[]>([])
 
   const [status, setStatus] = useState<'idle' | 'starting' | 'live' | 'recording' | 'done' | 'error'>('idle')
   const [quality, setQuality] = useState<QualityResult>({ ok: false, reasons: [], score: 0 })
@@ -125,15 +128,22 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
     const c = canvasRef.current
     c.width = v.videoWidth; c.height = v.videoHeight
     c.getContext('2d')!.drawImage(v, 0, 0)
+    const exif: Record<string, unknown> = {
+      timestamp: Date.now(),
+      width: v.videoWidth,
+      height: v.videoHeight,
+      facing_mode: facingMode,
+      user_agent: navigator.userAgent,
+    }
     c.toBlob(blob => {
       if (!blob) return
       const url = c.toDataURL('image/jpeg', 0.92)
       setCapturedUrl(url)
       setStatus('done')
       stopCamera()
-      onCapture(blob, url)
+      onCapture(blob, url, exif)
     }, 'image/jpeg', 0.92)
-  }, [stopCamera, onCapture])
+  }, [stopCamera, onCapture, facingMode])
 
   const startRecording = useCallback(() => {
     if (!mediaRef.current) return
@@ -150,7 +160,15 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
       setCapturedUrl(url)
       setStatus('done')
       stopCamera()
-      onCapture(blob, url)
+      const exif: Record<string, unknown> = {
+        timestamp: Date.now(),
+        gyroscope_samples: gyroRef.current.length,
+        gyroscope: gyroRef.current.slice(0, 600), // max 10s at 60Hz
+        duration_ms: (isAudio ? 3 : 5) * 1000,
+        user_agent: navigator.userAgent,
+      }
+      gyroRef.current = []
+      onCapture(blob, url, exif)
     }
     recorder.start(100)
     recorderRef.current = recorder
@@ -230,9 +248,32 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
       const url = tmp.toDataURL('image/jpeg', 0.92)
       setCapturedUrl(url)
       setStatus('done')
-      onCapture(blob, url)
+      onCapture(blob, url, { timestamp: Date.now(), source: 'demo', width: 640, height: 853 })
     }, 'image/jpeg', 0.92)
   }, [onCapture])
+
+  // Collect gyroscope samples during video/audio recording (anti-replay fraud signal)
+  useEffect(() => {
+    if (status !== 'recording') return
+    const handler = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity
+      if (a) gyroRef.current.push({ x: a.x ?? 0, y: a.y ?? 0, z: a.z ?? 0, t: Date.now() })
+    }
+    // iOS 13+ requires explicit permission; request was granted on camera start gesture
+    window.addEventListener('devicemotion', handler, { passive: true })
+    return () => window.removeEventListener('devicemotion', handler)
+  }, [status])
+
+  // Restart stream if tab was backgrounded (iOS Safari kills MediaStream on hide)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && status === 'live' && !mediaRef.current?.active) {
+        startCamera()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [status, startCamera])
 
   // Stop camera on unmount
   useEffect(() => () => stopCamera(), [stopCamera])

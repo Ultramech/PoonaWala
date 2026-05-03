@@ -46,8 +46,8 @@ export function CaptureFlow() {
     }
   }
 
-  const handleCapture = (blob: Blob, dataUrl: string) => {
-    addCapture({ type: step.type, blob, dataUrl, timestamp: Date.now() })
+  const handleCapture = (blob: Blob, dataUrl: string, exif?: Record<string, unknown>) => {
+    addCapture({ type: step.type, blob, dataUrl, timestamp: Date.now(), exif })
     setCaptured(prev => new Set([...prev, stepIdx]))
   }
 

@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useSessionStore, type AssessmentResult } from '../store/session'
+import { useSessionStore, type AssessmentResult, type SessionState } from '../store/session'
+import { assessAPI } from '../lib/api'
 
-// ─── Mock API response ───────────────────────────────────────────────────────
-// This is replaced by POST /api/assess in Phase 2. Keeps the demo
-// fully functional even without backend.
+// ─── Mock fallback (used when API is unreachable) ─────────────────────────────
 
 function buildMockResult(sessionId: string, weightG: number | null, isFailCase = false): AssessmentResult {
   const isFail = isFailCase
@@ -83,12 +82,54 @@ function buildMockResult(sessionId: string, weightG: number | null, isFailCase =
   }
 }
 
-// Simulated assess call (replace with fetch('/api/assess', ...) in Phase 2)
-async function assessSession(sessionId: string, weightG: number | null): Promise<AssessmentResult> {
-  await new Promise(r => setTimeout(r, 4500 + Math.random() * 2000))
-  // Simulate ~10% fail rate for demo realism
-  const isFail = Math.random() < 0.1
-  return buildMockResult(sessionId, weightG, isFail)
+async function assessSession(state: SessionState): Promise<AssessmentResult> {
+  const sessionId = state.sessionId ?? 'demo'
+  const weightG = state.weightG
+
+  // Send real base64 dataUrls for photo frames so VLM can process actual images.
+  // Non-photo captures (audio, video, selfie) are sent as opaque handles.
+  const captureTypes = Object.keys(state.captures) as (keyof typeof state.captures)[]
+  const photoTypes = captureTypes.filter(k => k !== 'audio' && k !== 'video' && k !== 'selfie')
+  const frames = photoTypes.map(k => {
+    const cap = state.captures[k as keyof typeof state.captures]
+    return cap?.dataUrl ?? `local://${sessionId}/${k}`
+  })
+  const videoCapture = state.captures['video']
+  const audioCapture = state.captures['audio']
+  const selfieCapture = state.captures['selfie']
+
+  // Minimum display time so animations can play
+  const minDelay = new Promise<void>(r => setTimeout(r, 3500))
+
+  const CACHE_KEY = 'goldeye_last_result'
+
+  try {
+    const [result] = await Promise.all([
+      assessAPI({
+        session_id: sessionId,
+        frames: frames.length > 0 ? frames : [`local://${sessionId}/demo`],
+        video: videoCapture ? `local://${sessionId}/video` : undefined,
+        audio: audioCapture ? `local://${sessionId}/audio` : undefined,
+        selfie: selfieCapture ? `local://${sessionId}/selfie` : undefined,
+        weight_g: weightG ?? undefined,
+        lang: state.lang ?? 'en',
+        device_metadata: { capture_count: captureTypes.length, ua: navigator.userAgent },
+      }),
+      minDelay,
+    ])
+    // Cache last good result for demo-day resilience
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(result)) } catch { /* storage full */ }
+    return result
+  } catch {
+    await minDelay
+    // Demo-day fallback: serve cached last-good result first, then mock
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) return JSON.parse(cached) as AssessmentResult
+    } catch { /* parse error */ }
+    const isFail = Math.random() < 0.1
+    return buildMockResult(sessionId, weightG, isFail)
+  }
 }
 
 const STEPS = [
@@ -117,8 +158,7 @@ export function Processing() {
     })
 
     // Call assess
-    const id = state.sessionId ?? 'demo'
-    assessSession(id, state.weightG).then(result => {
+    assessSession(state).then(result => {
       setResult(result)
       setDone(true)
       setTimeout(() => navigate('/result'), 600)
