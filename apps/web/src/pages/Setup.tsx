@@ -48,10 +48,10 @@ export function Setup() {
             </div>
           </div>
           {/* Corner guides */}
-          <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-gold-400/60 rounded-tl-lg" />
-          <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-gold-400/60 rounded-tr-lg" />
-          <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-gold-400/60 rounded-bl-lg" />
-          <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-gold-400/60 rounded-br-lg" />
+          <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-poonawala-red/60 rounded-tl-lg" />
+          <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-poonawala-red/60 rounded-tr-lg" />
+          <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-poonawala-red/60 rounded-bl-lg" />
+          <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-poonawala-red/60 rounded-br-lg" />
         </div>
 
         <h1 className="font-display font-bold text-2xl text-white text-center mb-2">
@@ -75,8 +75,8 @@ export function Setup() {
         <div className="space-y-3 mb-8">
           {TIPS.map(({ icon: Icon, key }, i) => (
             <div key={key} className="card flex items-center gap-4 p-4">
-              <div className="w-8 h-8 rounded-xl bg-gold-500/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-gold-400 text-sm">{i + 1}</span>
+              <div className="w-8 h-8 rounded-xl bg-poonawala-red/10 flex items-center justify-center flex-shrink-0">
+                <span className="font-bold text-poonawala-red text-sm">{i + 1}</span>
               </div>
               <p className="text-sm text-white/70">{t(key)}</p>
             </div>
@@ -84,11 +84,11 @@ export function Setup() {
         </div>
 
         {/* Coin info callout */}
-        <div className="glassmorphism-gold rounded-2xl p-4 mb-6">
+        <div className="bg-poonawala-red/10 border border-poonawala-red/20 backdrop-blur-md rounded-2xl p-4 mb-6">
           <div className="flex items-start gap-3">
             <span className="text-2xl">🪙</span>
             <div>
-              <p className="text-sm font-semibold text-gold-300 mb-1">Why the ₹10 coin?</p>
+              <p className="text-sm font-semibold text-poonawala-red mb-1">Why the ₹10 coin?</p>
               <p className="text-xs text-white/50 leading-relaxed">
                 The ₹10 coin is exactly 27mm across. Our AI uses it as a scale reference, white-balance anchor, and fraud check — solving three problems with one object.
               </p>
