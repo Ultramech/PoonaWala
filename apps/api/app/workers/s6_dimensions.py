@@ -1,3 +1,4 @@
+from typing import Optional, Union
 """
 S6 — Weight estimation from scale anchor + manual entry.
 Phase 2: coin-anchored bbox area → volume × density.
@@ -6,7 +7,7 @@ Phase 3: Depth Anything V2 Small monocular depth for volume.
 import time
 import logging
 from app.models.schemas import SignalResult
-from app.ml.image_utils import estimate_weight_from_bbox
+from app.data.image_utils import estimate_weight_from_bbox
 
 logger = logging.getLogger("goldeye.workers.s6")
 
@@ -16,8 +17,8 @@ DENSITY_22K = 17.75  # g/cm³
 async def run(
     session_id: str,
     frames: list[str],
-    weight_g: float | None = None,
-    s5_payload: dict | None = None,
+    weight_g: Optional[float] = None,
+    s5_payload: Optional[dict] = None,
     **_,
 ) -> SignalResult:
     t0 = time.time()

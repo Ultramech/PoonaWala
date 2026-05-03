@@ -6,7 +6,7 @@ plated brass (duller, more diffuse) and silver-plate (cool/neutral highlights).
 
 Pipeline:
   1. Decode available frames (top-down, 45°, side) + video (sample 5 frames).
-  2. Run per-frame specular analysis via app.ml.specular.
+  2. Run per-frame specular analysis via app.data.specular.
   3. Aggregate across frames — more frames → higher confidence.
   4. Return metal_score (0=non-gold, 1=strong gold signature) + confidence.
 
@@ -18,8 +18,8 @@ import logging
 import numpy as np
 
 from app.models.schemas import SignalResult
-from app.ml.specular import analyze_specular_multi
-from app.ml.image_utils import fetch_image_bytes
+from app.data.specular import analyze_specular_multi
+from app.data.image_utils import fetch_image_bytes
 
 logger = logging.getLogger("goldeye.workers.s4_specular")
 

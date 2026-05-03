@@ -287,7 +287,7 @@ async def test_conformal_width_equals_band_diff():
 
 async def test_synthetic_audio_cnn():
     """Audio CNN classifies synthetic WAV — returns valid solid_probability."""
-    from app.ml.audio import _cnn_classify, _wav_to_pcm
+    from app.data.audio import _cnn_classify, _wav_to_pcm
     wav_bytes = _make_wav_bytes(freq=1400.0)
     pcm, sr = _wav_to_pcm(wav_bytes)
     result = _cnn_classify(pcm, sr)
@@ -300,7 +300,7 @@ async def test_synthetic_audio_cnn():
 
 async def test_synthetic_audio_solid_vs_plated():
     """Solid-like audio should score differently from plated-like audio."""
-    from app.ml.audio import fft_heuristic
+    from app.data.audio import fft_heuristic
     # Solid-like: single dominant freq, slow decay
     sr = 16000
     t = np.linspace(0, 1.0, sr)
@@ -326,7 +326,7 @@ async def test_synthetic_audio_solid_vs_plated():
 
 async def test_huid_detector_analyze_hallmark():
     """analyze_hallmark returns correct structure."""
-    from app.ml.huid_detector import analyze_hallmark
+    from app.data.huid_detector import analyze_hallmark
     import cv2
     img = np.zeros((224, 224, 3), dtype=np.uint8)
     img[:, :, 2] = 200
@@ -343,7 +343,7 @@ async def test_huid_detector_analyze_hallmark():
 
 async def test_huid_detector_on_synthetic_image():
     """analyze_hallmark on a synthetic image produces valid output."""
-    from app.ml.huid_detector import analyze_hallmark
+    from app.data.huid_detector import analyze_hallmark
     import cv2
     imgs = sorted(SYNTHETIC_SOLID_DIR.glob("*.jpg")) if SYNTHETIC_SOLID_DIR.exists() else []
     if not imgs:

@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 from app.models.schemas import SignalResult
-from app.ml.image_utils import fetch_image_bytes
+from app.data.image_utils import fetch_image_bytes
 
 logger = logging.getLogger("goldeye.workers.s8")
 
@@ -95,7 +95,7 @@ def _infer_item_type(img_bgr: np.ndarray) -> str:
 async def _analyze_real_frame(url: str) -> dict:
     """Fetch a real frame and run local analysis. Returns partial payload dict."""
     try:
-        from app.ml.color import analyze_color
+        from app.data.color import analyze_color
         import cv2
 
         raw = await fetch_image_bytes(url)
@@ -191,7 +191,7 @@ async def run(session_id: str, frames: list[str], **_) -> SignalResult:
         # ── Production VLM override ───────────────────────────────────────────
         if _IS_PRODUCTION_VLM:
             try:
-                from app.ml.vlm import call_vlm
+                from app.data.vlm import call_vlm
                 vlm_result = await call_vlm(_VLM_PROMPT, real_frames[:6])
                 karat_band = vlm_result.get("estimated_karat_band", [avg_karat_lo, avg_karat_hi])
                 if not isinstance(karat_band, list) or len(karat_band) != 2:

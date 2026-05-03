@@ -23,8 +23,8 @@ from typing import Optional
 import numpy as np
 
 from app.models.schemas import SignalResult
-from app.ml.phash import compute_phash, hamming_distance, phash_to_hex
-from app.ml.image_utils import fetch_image_bytes
+from app.data.phash import compute_phash, hamming_distance, phash_to_hex
+from app.data.image_utils import fetch_image_bytes
 
 logger = logging.getLogger("goldeye.workers.s12_graph")
 

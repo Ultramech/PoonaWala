@@ -3,8 +3,8 @@ Phase 6 tests: ConvNeXt-V2 ONNX inference, Audio CNN, Score-CAM-lite, Grad-CAM U
 """
 import numpy as np
 import pytest
-from app.ml.convnext import predict as convnext_predict, score_cam_lite, _load_session, _MODEL_PATH
-from app.ml.audio import fft_heuristic, _mel_spectrogram, _cnn_classify, _wav_to_pcm
+from app.data.convnext import predict as convnext_predict, score_cam_lite, _load_session, _MODEL_PATH
+from app.data.audio import fft_heuristic, _mel_spectrogram, _cnn_classify, _wav_to_pcm
 
 pytestmark = pytest.mark.asyncio
 

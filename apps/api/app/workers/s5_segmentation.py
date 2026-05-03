@@ -8,7 +8,7 @@ import logging
 from typing import Optional
 import numpy as np
 from app.models.schemas import SignalResult
-from app.ml.image_utils import fetch_image_bytes, detect_coin_hough, estimate_jewelry_bbox_px
+from app.data.image_utils import fetch_image_bytes, detect_coin_hough, estimate_jewelry_bbox_px
 
 logger = logging.getLogger("goldeye.workers.s5")
 

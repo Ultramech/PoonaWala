@@ -38,6 +38,7 @@ from app.workers.s9_reverse_catalog import run as run_s9
 from app.workers.s10_telemetry import run as run_s10
 from app.workers.s11_audio import run as run_s11
 from app.workers.s12_graph import run as run_s12
+from app.workers.s13_liveness import run as run_s13
 from app.workers.fusion import extract_features, fuse
 from app.xai.shap_explainer import explain
 from app.xai.text_generator import generate_reasoning, generate_counterfactual
@@ -74,8 +75,8 @@ async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depend
                           s5_payload=s5.payload)
         return s5, s6
 
-    # Fan-out: all 12 signals in parallel (mini-chains preserve ordering within them)
-    (s1, s2), (s5, s6), s3, s4, s7, s8, s9, s10, s11 = await asyncio.gather(
+    # Fan-out: all 13 signals in parallel (mini-chains preserve ordering within them)
+    (s1, s2), (s5, s6), s3, s4, s7, s8, s9, s10, s11, s13 = await asyncio.gather(
         chain_huid_hallmark(),
         chain_seg_dimensions(),
         run_s3(req.session_id, frames=req.frames),
@@ -85,6 +86,7 @@ async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depend
         run_s9(req.session_id, frames=req.frames),
         run_s10(req.session_id, device_metadata=req.device_metadata),
         run_s11(req.session_id, audio_url=req.audio),
+        run_s13(req.session_id, selfie_url=req.selfie),
         return_exceptions=False,
     )
 
@@ -106,6 +108,7 @@ async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depend
         "s10": s10.payload,
         "s11": s11.payload if not s11.error else {}, "s11_conf": s11.confidence if not s11.error else 0.0,
         "s12": s12.payload if not s12.error else {}, "s12_conf": s12.confidence if not s12.error else 0.0,
+        "s13": s13.payload if not s13.error else {}, "s13_conf": s13.confidence if not s13.error else 0.5,
     }
     features = extract_features(signals_dict)
     fused = fuse(features, manual_weight_g=req.weight_g)
@@ -157,10 +160,12 @@ async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depend
     if catalog_match >= 0.85: fraud_triggers.append("catalog_stock_photo_match")
     if graph_anomaly >= 0.4:  fraud_triggers.append("cross_session_reuse_detected")
 
-    # Confidence: weighted average of active signals (all 12 now), penalised by fraud
+    # Confidence: weighted average of active signals (13 total now), penalised by fraud + liveness
     active = [s for s in [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10] if not s.error]
     base_conf  = sum(s.confidence for s in active) / len(active) if active else 0.5
-    confidence = max(0.0, min(1.0, base_conf - fraud_score * 0.3))
+    # S13 liveness: strong multiplier (if no selfie, neutral 0.5)
+    liveness_mult = max(0.5, s13.confidence) if req.selfie and not s13.error else 1.0
+    confidence = max(0.0, min(1.0, base_conf * liveness_mult - fraud_score * 0.3))
 
     routing = route_session(confidence, fraud_score, rbi["loan_inr"], huid_verified,
                             rbi_reject_reason=rbi.get("reject_reason"))
