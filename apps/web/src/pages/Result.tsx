@@ -162,8 +162,8 @@ export function Result() {
         <button id="result-home" onClick={() => { reset(); navigate('/') }} className="btn-icon">
           <ChevronRight className="w-5 h-5 rotate-180 text-white/60" />
         </button>
-        <span className="font-display font-semibold text-sm text-white/70">Pre-Qualification Result</span>
-        <button id="result-share" onClick={() => navigator.share?.({ title: 'GoldEye Result', text: 'My gold loan pre-qualification' })} className="btn-icon">
+        <span className="font-display font-semibold text-sm text-white/70">Poonawala GoldEye Result</span>
+        <button id="result-share" onClick={() => navigator.share?.({ title: 'Poonawala GoldEye Result', text: 'My gold loan pre-qualification' })} className="btn-icon">
           <Share2 className="w-4 h-4 text-white/50" />
         </button>
       </div>
@@ -183,9 +183,9 @@ export function Result() {
           {/* Main value cards */}
           <div className="px-5 mb-4 grid grid-cols-2 gap-3">
             {/* Purity */}
-            <div className="card-gold p-4">
+            <div className="card-red p-4">
               <p className="label mb-2">{t('result_purity')}</p>
-              <div className="font-display font-black text-3xl text-gradient-gold">
+              <div className="font-display font-black text-3xl text-poonawala-red">
                 <AnimatedNumber target={result.purity.point_estimate_karat} suffix="K" />
               </div>
               <p className="text-xs text-white/40 mt-1">
@@ -218,13 +218,13 @@ export function Result() {
                 <p className="label">{t('result_value')}</p>
                 <span className="text-xs text-white/30">IBJA ref price</span>
               </div>
-              <div className="font-display font-black text-4xl text-gradient-gold mb-1">
+              <div className="font-display font-black text-4xl text-poonawala-red mb-1">
                 <AnimatedNumber target={result.value_inr.band_low} prefix="₹" />
                 <span className="text-white/30 text-2xl mx-2">–</span>
                 <AnimatedNumber target={result.value_inr.band_high} prefix="₹" />
               </div>
               <div className="band-track mt-3">
-                <div className="band-fill" style={{ background: 'linear-gradient(90deg, #D4A017, #F5C842)', width: '100%' }} />
+                <div className="band-fill" style={{ background: '#e31d25', width: '100%' }} />
               </div>
               <p className="text-xs text-white/30 mt-2">
                 Stone weight ({result.value_inr.stone_weight_excluded_g}g) excluded from calculation
@@ -234,10 +234,10 @@ export function Result() {
 
           {/* Loan offer — the hero number */}
           <div className="mx-5 mb-4">
-            <div className="relative card-gold p-6 overflow-hidden">
-              <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-gold-500/5 blur-xl" />
+            <div className="relative card-red p-6 overflow-hidden border border-poonawala-red/20 rounded-3xl bg-surface-2">
+              <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-poonawala-red/5 blur-xl" />
               <p className="label mb-2">{t('result_loan')}</p>
-              <div className="font-display font-black text-5xl text-gradient-gold mb-1 leading-none">
+              <div className="font-display font-black text-5xl text-poonawala-red mb-1 leading-none">
                 <AnimatedNumber target={result.loan_offer.band_low_inr} prefix="₹" duration={1400} />
               </div>
               <div className="flex items-baseline gap-2 mb-3">
@@ -247,8 +247,8 @@ export function Result() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="badge-gold">{result.loan_offer.ltv_applied_pct}% LTV</span>
-                <span className="badge-gold">{result.loan_offer.tier === 'under_2_5L' ? 'Under ₹2.5L tier' : 'Above ₹2.5L tier'}</span>
+                <span className="badge-red">{result.loan_offer.ltv_applied_pct}% LTV</span>
+                <span className="badge-red">{result.loan_offer.tier === 'under_2_5L' ? 'Under ₹2.5L tier' : 'Above ₹2.5L tier'}</span>
               </div>
             </div>
           </div>
@@ -376,7 +376,7 @@ export function Result() {
       <div className="px-5 pb-8">
         <div className="divider mb-5" />
         <div className="flex items-center justify-center gap-4">
-          <span className="badge-gold">{t('footer_rbi')}</span>
+          <span className="badge-red">{t('footer_rbi')}</span>
           <span className="badge-blue">{t('footer_dpdp')}</span>
         </div>
         <p className="text-center text-xs text-white/20 mt-4">{t('powered_by')}</p>
