@@ -1,31 +1,5 @@
 {
-  "buildCommand": "cd apps/web && npm run build",
+  "buildCommand": "cd apps/web && npm install && npm run build",
   "outputDirectory": "apps/web/dist",
-  "framework": "vite",
-  "env": {
-    "VITE_API_URL": "@api_url"
-  },
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "python3.11"
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/session/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/health(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "framework": "vite"
 }
