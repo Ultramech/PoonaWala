@@ -57,6 +57,17 @@ function quickQualityCheck(canvas: HTMLCanvasElement): QualityResult {
   return { ok: reasons.length === 0, reasons, score }
 }
 
+// Browser TTS helper for live guidance
+function speak(text: string) {
+  if (!('speechSynthesis' in window)) return
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = localStorage.getItem('goldeye_lang') === 'hi' ? 'hi-IN' : 'en-US'
+  u.rate = 1.05
+  u.pitch = 1.0
+  window.speechSynthesis.speak(u)
+}
+
 interface CameraProps {
   type: CaptureType
   onCapture: (blob: Blob, dataUrl: string, exif?: Record<string, unknown>) => void
@@ -79,45 +90,87 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const qualityRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [guidanceText, setGuidanceText] = useState<string>('Point camera at jewelry…')
+
+  const liveWsRef = useRef<WebSocket | null>(null)
+  const lastGuidanceRef = useRef<number>(0)
 
   const startCamera = useCallback(async () => {
     setStatus('starting')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: isAudio || isVideo ? true : false,
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: !!(isAudio || isVideo),
       })
       mediaRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
+
+      const video = videoRef.current!
+      video.muted = true
+      video.srcObject = stream
       setStatus('live')
 
-      // Start real-time quality checks every 500ms (photo modes only)
+      await new Promise(r => setTimeout(r, 50))
+      try { await video.play() } catch (_) {}
+
+      // Start Live Guidance WebSocket
       if (!isVideo && !isAudio) {
+        const originUrl = (import.meta.env.VITE_API_URL as string) || window.location.origin
+        const wsUrl = new URL(originUrl)
+        wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl.pathname = '/api/ws/live-guidance'
+        
+        const ws = new WebSocket(wsUrl.toString())
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data)
+            if (data.text) {
+              setGuidanceText(data.text)
+              speak(data.text)
+            }
+          } catch {
+            // binary audio data — ignore for now
+          }
+        }
+        liveWsRef.current = ws
+
         qualityRef.current = setInterval(() => {
-          if (!videoRef.current || !canvasRef.current) return
           const v = videoRef.current
           const c = canvasRef.current
-          c.width = v.videoWidth || 640
-          c.height = v.videoHeight || 480
-          c.getContext('2d')!.drawImage(v, 0, 0)
-          setQuality(quickQualityCheck(c))
+          const ws = liveWsRef.current
+          if (!v || !c || v.videoWidth <= 0) return
+          
+          c.width = v.videoWidth
+          c.height = v.videoHeight
+          const ctx = c.getContext('2d')!
+          ctx.drawImage(v, 0, 0)
+          
+          const q = quickQualityCheck(c)
+          setQuality(q)
+
+          // Send to Poonawala AI for Live Guidance every 2s
+          if (ws && ws.readyState === WebSocket.OPEN && Date.now() - lastGuidanceRef.current > 2000) {
+            lastGuidanceRef.current = Date.now()
+            // Send smaller frame for guidance to save bandwidth
+            const thumb = document.createElement('canvas')
+            thumb.width = 320; thumb.height = 240
+            thumb.getContext('2d')!.drawImage(c, 0, 0, 320, 240)
+            const b64 = thumb.toDataURL('image/jpeg', 0.5).split(',')[1]
+            ws.send(JSON.stringify({ image_b64: b64 }))
+          }
         }, 500)
       }
     } catch (e: any) {
       setStatus('error')
-      onError?.('Camera access denied. Allow camera in browser settings.')
+      onError?.(e?.message || 'Camera error')
     }
   }, [facingMode, isVideo, isAudio, onError])
 
   const stopCamera = useCallback(() => {
     if (qualityRef.current) clearInterval(qualityRef.current)
+    if (liveWsRef.current) {
+      liveWsRef.current.close()
+      liveWsRef.current = null
+    }
     mediaRef.current?.getTracks().forEach(t => t.stop())
     mediaRef.current = null
   }, [])
@@ -280,6 +333,8 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
 
   const maxSec = isAudio ? 3 : 5
 
+  const isLive = status === 'live' || status === 'recording'
+
   return (
     <div className="w-full">
       <canvas ref={canvasRef} className="hidden" />
@@ -321,10 +376,17 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
         </div>
       )}
 
-      {(status === 'live' || status === 'recording') && (
-        <div className="relative">
-          <div className="camera-viewport rounded-3xl overflow-hidden">
-            <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+      {/* Video element always in DOM — videoRef never null when stream arrives */}
+      <div className="relative" style={{ display: isLive ? 'block' : 'none' }}>
+        <div className="camera-viewport rounded-3xl overflow-hidden bg-black">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover bg-black"
+            style={{ display: 'block' }}
+          />
             {/* Corner guides */}
             <div className="cam-overlay">
               <div className="cam-corner cam-corner-tl" />
@@ -352,16 +414,11 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
             )}
           </div>
 
-          {/* Quality indicator */}
+          {/* Poonawala AI Guidance */}
           {!isVideo && !isAudio && (
-            <div className={clsx(
-              'absolute -bottom-1 left-4 right-4 py-2 px-4 rounded-b-2xl flex items-center justify-between text-xs font-medium',
-              quality.ok
-                ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                : 'bg-red-500/15 text-red-400 border border-red-500/20'
-            )}>
-              <span>{quality.ok ? '✓ ' + 'Perfect shot' : '✗ ' + quality.reasons[0]}</span>
-              <span>Score: {quality.score}/100</span>
+            <div className="absolute -bottom-1 left-4 right-4 py-2.5 px-4 rounded-b-2xl flex items-center gap-2 text-xs font-medium bg-black/60 text-white/90 border border-white/10 backdrop-blur-sm">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+              <span className="truncate">{guidanceText}</span>
             </div>
           )}
 
@@ -385,29 +442,38 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
               <button
                 id={`capture-${type}`}
                 onClick={capture}
-                disabled={!quality.ok}
-                className={clsx(
-                  'w-20 h-20 rounded-full border-4 flex items-center justify-center shadow-lg transition-all',
-                  quality.ok
-                    ? 'bg-white border-gold-400/40 active:scale-90 shadow-gold'
-                    : 'bg-surface-3 border-white/10 opacity-50 cursor-not-allowed'
-                )}
+                className="w-20 h-20 rounded-full border-4 flex items-center justify-center shadow-lg transition-all bg-white border-gold-400/40 active:scale-90 shadow-gold"
               >
-                <div className={clsx('w-14 h-14 rounded-full', quality.ok ? 'bg-white' : 'bg-surface-4')} />
+                <div className="w-14 h-14 rounded-full bg-white" />
               </button>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
       {status === 'error' && (
-        <div className="camera-viewport flex flex-col items-center justify-center gap-4 bg-red-500/5 border border-red-500/20 rounded-3xl">
+        <div className="camera-viewport flex flex-col items-center justify-center gap-4 bg-red-500/5 border border-red-500/20 rounded-3xl p-6">
           <span className="text-4xl">🚫</span>
           <div className="text-center px-4">
-            <p className="font-semibold text-white mb-1">Camera unavailable</p>
-            <p className="text-xs text-white/40">Allow camera access in browser settings, then tap retry.</p>
+            <p className="font-semibold text-white mb-2">Camera unavailable</p>
+            <p className="text-xs text-white/50 mb-4">
+              <strong>Allow camera access:</strong><br/>
+              <br/>
+              <strong>Android:</strong><br/>
+              Settings → Apps → Browser → Permissions → Camera → Allow<br/>
+              <br/>
+              <strong>iPhone:</strong><br/>
+              Settings → Safari/Chrome → Camera → Allow<br/>
+              <br/>
+              <strong>Mac:</strong><br/>
+              System Preferences → Security & Privacy → Camera → Allow<br/>
+            </p>
+            <p className="text-xs text-white/40 mb-3">Or use demo mode to test without hardware.</p>
           </div>
-          <button id={`camera-retry-${type}`} onClick={startCamera} className="btn-outline-gold">Retry</button>
+          <div className="flex gap-3 w-full">
+            <button id={`camera-retry-${type}`} onClick={startCamera} className="flex-1 btn-outline-gold">
+              Retry Camera
+            </button>
+          </div>
         </div>
       )}
 
