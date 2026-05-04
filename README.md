@@ -176,7 +176,6 @@ python ml/synthetic/generate_jewelry.py
 - SHAP TreeExplainer for feature attribution and counterfactual reasoning
 
 **Infrastructure**
-- Vercel (frontend, SPA routing)
 - Render (backend, free tier — ONNX CPU inference)
 - Docker Compose (Postgres, Redis, Qdrant, MinIO for full local stack)
 
@@ -304,9 +303,9 @@ VITE_API_URL=https://abc123.ngrok-free.app
 
 Restart the dev server (`npm run dev`) and open it on your phone.
 
-**Option B — Production frontend on Vercel:**
+**Option B — Deployed frontend:**
 
-Set `VITE_API_URL` to the ngrok URL in your Vercel project environment variables and redeploy.
+Set `VITE_API_URL` to the ngrok URL in your hosting provider's environment variables and redeploy.
 
 > **Note:** ngrok free tier URLs change every session. For stable public URLs use a paid ngrok plan or deploy to Render.
 
@@ -324,10 +323,18 @@ ALLOWED_ORIGINS=https://abc123.ngrok-free.app,http://localhost:5173
 
 ### Backend (`apps/api/.env`)
 
+> **Required keys — set these before first deploy:**
+>
+> | Key | Where to get it |
+> |---|---|
+> | `TWOFACTOR_API_KEY` | Sign up at [2factor.in](https://2factor.in) → Dashboard → API Key. Without this, OTP SMS won't send (dev bypass accepts any 6-digit code). |
+> | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) → Create API key. Used as a fallback VLM when local model confidence is below threshold. Leave blank to disable the fallback. |
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `TWOFACTOR_API_KEY` | `` (empty) | 2Factor.in API key for OTP SMS. Empty = dev bypass (any 6-digit code accepted) |
-| `VLM_API_URL` | `http://localhost:11434/v1` | Local vLLM / Ollama endpoint (optional fallback) |
+| `TWOFACTOR_API_KEY` | `` (empty) | 2Factor.in API key for OTP SMS. **Required for production.** Empty = dev bypass (any 6-digit code accepted). |
+| `GEMINI_API_KEY` | `` (empty) | Google Gemini API key. **Optional fallback** — activated when local vision model confidence drops below threshold. Leave blank to rely entirely on on-device models. |
+| `VLM_API_URL` | `http://localhost:11434/v1` | Local vLLM / Ollama endpoint (alternative fallback) |
 | `VLM_MODEL` | `qwen2.5vl` | Model name passed to local VLM endpoint |
 | `VLM_TIMEOUT_S` | `30` | VLM request timeout in seconds |
 | `VLM_API_KEY` | `none` | Bearer token for hosted VLM (Groq/RunPod) |
