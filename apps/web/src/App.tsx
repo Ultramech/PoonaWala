@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Login, getUser } from './pages/Login'
+import { Home } from './pages/Home'
+import { LoanEstimator } from './pages/LoanEstimator'
+import { Profile } from './pages/Profile'
 import { LanguagePicker } from './pages/LanguagePicker'
-import { Welcome } from './pages/Welcome'
 import { Consent } from './pages/Consent'
 import { OTP } from './pages/OTP'
 import { Setup } from './pages/Setup'
@@ -11,27 +14,28 @@ import { Result } from './pages/Result'
 import { Dashboard } from './pages/Dashboard'
 import { DashboardDetail } from './pages/DashboardDetail'
 import { FieldAgent } from './pages/FieldAgent'
-import { Home } from './pages/Home'
-import { LoanEstimator } from './pages/LoanEstimator'
-import { LoanHistory } from './pages/LoanHistory'
-import { Profile } from './pages/Profile'
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  return getUser() ? <>{children}</> : <Navigate to="/login" replace />
+}
 
 function App() {
   return (
     <BrowserRouter>
       <div className="max-w-md mx-auto min-h-screen relative overflow-hidden">
         <Routes>
-          {/* New primary navigation */}
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/estimate" element={<LoanEstimator />} />
-          <Route path="/history" element={<LoanHistory />} />
-          <Route path="/profile" element={<Profile />} />
+          {/* Auth */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Main app — requires login */}
+          <Route path="/" element={<Navigate to={getUser() ? '/home' : '/login'} replace />} />
+          <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
+          <Route path="/estimate" element={<RequireAuth><LoanEstimator /></RequireAuth>} />
+          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/apply" element={<Navigate to="/consent" replace />} />
 
-          {/* Loan application flow (unchanged) */}
+          {/* Loan application flow */}
           <Route path="/language" element={<LanguagePicker />} />
-          <Route path="/welcome" element={<Welcome />} />
           <Route path="/consent" element={<Consent />} />
           <Route path="/otp" element={<OTP />} />
           <Route path="/setup" element={<Setup />} />
@@ -45,7 +49,7 @@ function App() {
           <Route path="/dashboard/session/:id" element={<DashboardDetail />} />
           <Route path="/agent" element={<FieldAgent />} />
 
-          <Route path="*" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </BrowserRouter>

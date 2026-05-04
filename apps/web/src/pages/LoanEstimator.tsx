@@ -41,7 +41,7 @@ export function LoanEstimator() {
     fetchGoldPrice().then(setGold).catch(() => {})
   }, [])
 
-  const loan = gold ? calcLoanBand(weight, karat, gold.pricePerGram) : null
+  const loan = gold ? calcLoanBand(weight, karat, gold.pricePerGram24k) : null
 
   const handleWeightInput = useCallback((val: string) => {
     setWeightInput(val)
@@ -74,7 +74,7 @@ export function LoanEstimator() {
           <div className="flex items-center justify-between bg-[#141824] border border-white/6 rounded-2xl px-4 py-3">
             <div>
               <p className="text-[10px] text-white/40 uppercase tracking-wider">24K Gold Price</p>
-              <p className="font-display font-bold text-gold-400 text-xl">₹{gold.pricePerGram.toLocaleString('en-IN')}/gm</p>
+              <p className="font-display font-bold text-gold-400 text-xl">₹{gold.pricePerGram24k.toLocaleString('en-IN')}/gm</p>
             </div>
             <button onClick={() => fetchGoldPrice().then(setGold)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
               <RefreshCw className="w-3.5 h-3.5 text-white/40" />

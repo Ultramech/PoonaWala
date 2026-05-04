@@ -1,11 +1,12 @@
-const GOLD_API_KEY = 'ae1f3e7e6228ea2b1aa0ef56f9019b68'
+const API_KEY = import.meta.env.VITE_METAL_API_KEY as string
 const TROY_OZ_TO_GRAMS = 31.1035
 
 export interface GoldPriceData {
-  pricePerGram: number
-  pricePerOz: number
-  change: number
-  changePercent: number
+  pricePerGram24k: number
+  pricePerGram22k: number
+  pricePerGram18k: number
+  usdPerOz: number
+  inrPerUsd: number
   timestamp: number
 }
 
@@ -15,20 +16,24 @@ const CACHE_MS = 60_000
 export async function fetchGoldPrice(): Promise<GoldPriceData> {
   if (cached && Date.now() - cached.fetchedAt < CACHE_MS) return cached.data
 
-  const res = await fetch('https://www.goldapi.io/api/XAU/INR', {
-    headers: { 'x-access-token': GOLD_API_KEY, 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) throw new Error(`Gold API error: ${res.status}`)
+  const res = await fetch(
+    `https://api.metalpriceapi.com/v1/latest?api_key=${API_KEY}&base=USD&currencies=XAU,INR`
+  )
+  if (!res.ok) throw new Error(`Metal API ${res.status}`)
   const json = await res.json()
+  if (!json.success) throw new Error('Metal API returned success=false')
 
-  const pricePerOz: number = json.price ?? json.price_gram_24k * TROY_OZ_TO_GRAMS
-  const pricePerGram = json.price_gram_24k ?? pricePerOz / TROY_OZ_TO_GRAMS
+  const { XAU, INR } = json.rates as { XAU: number; INR: number }
+  // XAU = oz per USD, INR = INR per USD
+  const inrPerOz = INR / XAU
+  const pricePerGram24k = Math.round(inrPerOz / TROY_OZ_TO_GRAMS)
 
   const data: GoldPriceData = {
-    pricePerGram: Math.round(pricePerGram),
-    pricePerOz: Math.round(pricePerOz),
-    change: json.ch ?? 0,
-    changePercent: json.chp ?? 0,
+    pricePerGram24k,
+    pricePerGram22k: Math.round(pricePerGram24k * (22 / 24)),
+    pricePerGram18k: Math.round(pricePerGram24k * (18 / 24)),
+    usdPerOz: Math.round(INR / XAU / INR * 100) / 100,
+    inrPerUsd: Math.round(INR * 100) / 100,
     timestamp: json.timestamp ?? Date.now() / 1000,
   }
   cached = { data, fetchedAt: Date.now() }

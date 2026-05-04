@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Shield, Globe, Bell, HelpCircle, LogOut, Check, ChevronDown } from 'lucide-react'
+import { Shield, Bell, HelpCircle, LogOut, Check, ChevronDown, ChevronRight, Globe } from 'lucide-react'
 import { BottomNav } from '../components/BottomNav'
+import { getUser } from './Login'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 
@@ -37,6 +38,7 @@ function SettingRow({ icon: Icon, label, value, onClick, danger = false }: {
 export function Profile() {
   const navigate = useNavigate()
   const { i18n } = useTranslation()
+  const user = getUser()
   const [showLangPicker, setShowLangPicker] = useState(false)
   const [currentLang, setCurrentLang] = useState(
     LANGUAGES.find(l => l.code === i18n.language) ?? LANGUAGES[0]
@@ -46,6 +48,11 @@ export function Profile() {
     setCurrentLang(lang)
     i18n.changeLanguage(lang.code)
     setShowLangPicker(false)
+  }
+
+  const signOut = () => {
+    localStorage.removeItem('gp_user')
+    navigate('/login')
   }
 
   return (
@@ -63,15 +70,17 @@ export function Profile() {
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-poonawala-red to-red-700 flex items-center justify-center shadow-[0_0_20px_rgba(227,29,37,0.3)]">
-                <span className="text-2xl font-display font-black text-white">GP</span>
+                <span className="text-2xl font-display font-black text-white">
+                  {user?.name?.charAt(0).toUpperCase() ?? 'G'}
+                </span>
               </div>
               <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 border-2 border-[#141824] flex items-center justify-center">
                 <Check className="w-2.5 h-2.5 text-white" />
               </div>
             </div>
             <div>
-              <p className="font-display font-bold text-white text-lg">Gold Applicant</p>
-              <p className="text-sm text-white/50">+91 98765 43210</p>
+              <p className="font-display font-bold text-white text-lg">{user?.name ?? 'User'}</p>
+              <p className="text-sm text-white/50">+91 {user?.phone ?? '—'}</p>
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] text-green-400 font-semibold">
                   KYC VERIFIED
@@ -165,7 +174,7 @@ export function Profile() {
 
         {/* Sign out */}
         <button
-          onClick={() => navigate('/language')}
+          onClick={signOut}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-red-500/20 text-red-400 text-sm"
         >
           <LogOut className="w-4 h-4" />
