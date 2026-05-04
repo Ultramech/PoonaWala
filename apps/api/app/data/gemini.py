@@ -14,7 +14,7 @@ import httpx
 logger = logging.getLogger("goldeye.gemini")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
@@ -316,6 +316,10 @@ This should be a TOP-DOWN (overhead) shot of gold jewelry placed flat on a surfa
 A ₹10 rupee coin may or may not be present — it is OPTIONAL and its absence must NOT cause rejection.
 
 Scoring logic (compute quality_score 0.0–1.0):
+  FIRST: Is this gold jewelry? If the item is clearly NOT gold jewelry
+  (e.g., electronics, plastic, household items, non-jewelry metal),
+  set approved=false immediately with quality_score=0.0.
+
   +0.30  jewelry clearly visible and recognisable
   +0.20  image in sharp focus (not blurry)
   +0.20  good lighting (not too dark, not overexposed / washed out)
@@ -323,17 +327,19 @@ Scoring logic (compute quality_score 0.0–1.0):
   +0.10  ₹10 coin present (optional scale reference — adds confidence)
   +0.05  full piece fits inside the frame
   Deduct 0.25 if jewelry is barely or not visible at all.
+  Deduct 1.0 if item is NOT gold jewelry (e.g., electronics, AirPods, keys, plastic).
 
-approved = true if quality_score >= 0.55 AND jewelry is at least partially visible.
-Reject (approved=false) only if the jewelry cannot be properly assessed (blurry, too dark, not visible).
+approved = true if quality_score >= 0.55 AND item IS gold jewelry.
+Reject (approved=false) if the item is not gold jewelry, or if the jewelry cannot be properly assessed (blurry, too dark, not visible).
 
 Return ONLY valid JSON (no markdown fences):
 {{
   "approved": boolean,
   "quality_score": 0.0-1.0,
-  "feedback": "One direct sentence. If approved, compliment and note any hallmarks/item type seen. If rejected, tell user exactly what to fix.",
+  "feedback": "One direct sentence. If approved, compliment and note any hallmarks/item type seen. If rejected, tell user exactly what to fix or state that the item is not jewelry.",
   "issues": ["list only real blocking issues, omit coin absence"],
   "detected": {{
+    "is_gold_jewelry": boolean,
     "jewelry_visible": boolean,
     "coin_visible": boolean,
     "in_focus": boolean,
@@ -347,14 +353,17 @@ Return ONLY valid JSON (no markdown fences):
 The goal: verify depth and thickness of the piece are clearly visible.
 
 Scoring logic (quality_score 0.0–1.0):
+  FIRST: Is this gold jewelry? If not, set approved=false with quality_score=0.0.
+
   +0.30  jewelry clearly visible
   +0.25  angled view (not flat top-down, not purely side-on) showing 3D form
   +0.20  depth or thickness visible
   +0.15  in focus
   +0.10  good lighting
   Deduct 0.30 if jewelry is not visible; 0.15 if angle is wrong (flat or side).
+  Deduct 1.0 if item is NOT gold jewelry.
 
-approved = true if quality_score >= 0.55 AND jewelry visible.
+approved = true if quality_score >= 0.55 AND item IS gold jewelry.
 
 Return ONLY valid JSON:
 {{
@@ -363,6 +372,7 @@ Return ONLY valid JSON:
   "feedback": "One direct sentence.",
   "issues": [],
   "detected": {{
+    "is_gold_jewelry": boolean,
     "jewelry_visible": boolean,
     "angle_correct": boolean,
     "depth_visible": boolean,
@@ -375,14 +385,17 @@ Return ONLY valid JSON:
 Goal: clearly show thickness and cross-section of the piece.
 
 Scoring logic (quality_score 0.0–1.0):
+  FIRST: Is this gold jewelry? If not, set approved=false with quality_score=0.0.
+
   +0.30  jewelry visible
   +0.30  side profile view (not top-down, not angled)
   +0.20  thickness/cross-section clearly visible
   +0.15  in focus
   +0.05  good lighting
   Deduct 0.30 if jewelry not visible; 0.20 if angle is wrong.
+  Deduct 1.0 if item is NOT gold jewelry.
 
-approved = true if quality_score >= 0.55.
+approved = true if quality_score >= 0.55 AND item IS gold jewelry.
 
 Return ONLY valid JSON:
 {{
@@ -391,6 +404,7 @@ Return ONLY valid JSON:
   "feedback": "One direct sentence.",
   "issues": [],
   "detected": {{
+    "is_gold_jewelry": boolean,
     "jewelry_visible": boolean,
     "side_profile_visible": boolean,
     "thickness_visible": boolean,
@@ -408,6 +422,8 @@ Hallmark knowledge:
 - Maker's mark: brand or manufacturer initials
 
 Scoring logic (quality_score 0.0–1.0):
+  FIRST: Is this gold jewelry? If not, set approved=false with quality_score=0.0.
+
   +0.25  any hallmark or marking visible
   +0.25  marking is sharp and in focus
   +0.20  BIS logo clearly visible
@@ -415,8 +431,9 @@ Scoring logic (quality_score 0.0–1.0):
   +0.10  good lighting (no glare, no shadow on stamp)
   +0.05  HUID code visible
   Deduct 0.30 if image is so blurry nothing can be read.
+  Deduct 1.0 if item is NOT gold jewelry.
 
-approved = true if quality_score >= 0.45 (even partial visibility of a marking counts).
+approved = true if quality_score >= 0.45 AND item IS gold jewelry.
 {"Estimated price per gram at detected karat: use price_line above multiplied by (karat/24)." if gold_price_24k > 0 else ""}
 
 Return ONLY valid JSON:
@@ -426,6 +443,7 @@ Return ONLY valid JSON:
   "feedback": "One sentence: state exactly what hallmark was found (e.g. '22K BIS hallmark detected — estimated ₹X,XXX/g at current rate') or what to fix.",
   "issues": [],
   "detected": {{
+    "is_gold_jewelry": boolean,
     "hallmark_visible": boolean,
     "karat_marking": "22K" or "18K" or "916" etc or null,
     "karat_numeric": number or null,
@@ -441,14 +459,17 @@ Return ONLY valid JSON:
 The selfie must show a person holding or wearing the same gold jewelry assessed in previous steps.
 
 Scoring logic (quality_score 0.0–1.0):
+  FIRST: Is there gold jewelry visible in the photo? If not, set approved=false with quality_score=0.0.
+
   +0.35  human face clearly visible and in focus
   +0.25  gold jewelry visible in the same frame
   +0.20  face well-lit (not in shadow, not overexposed)
   +0.10  photo appears live (not a photo-of-a-photo, no screen glare)
   +0.10  jewelry and face both sharp
   Deduct 0.35 if no face visible; 0.20 if no jewelry visible.
+  Deduct 1.0 if no jewelry is visible or if it's not gold jewelry.
 
-approved = true if quality_score >= 0.55 AND face is visible.
+approved = true if quality_score >= 0.55 AND face is visible AND jewelry is visible.
 
 Return ONLY valid JSON:
 {{
@@ -457,6 +478,7 @@ Return ONLY valid JSON:
   "feedback": "One direct sentence.",
   "issues": [],
   "detected": {{
+    "is_gold_jewelry": boolean,
     "face_visible": boolean,
     "jewelry_visible": boolean,
     "in_focus": boolean,
@@ -470,7 +492,7 @@ Return ONLY valid JSON:
   "quality_score": 0.8,
   "feedback": "Video received — motion analysis will run during full assessment.",
   "issues": [],
-  "detected": {"jewelry_visible": true}
+  "detected": {"jewelry_visible": true, "is_gold_jewelry": true}
 }""",
 
         "audio": """{
@@ -478,7 +500,7 @@ Return ONLY valid JSON:
   "quality_score": 0.8,
   "feedback": "Audio received — acoustic resonance analysis will run during full assessment.",
   "issues": [],
-  "detected": {}
+  "detected": {"is_gold_jewelry": true}
 }""",
     }
 
@@ -505,10 +527,10 @@ async def evaluate_frame(image_base64: str, frame_type: str) -> dict:
 
     if not GEMINI_API_KEY:
         return {
-            "approved": True,
-            "quality_score": 0.7,
-            "feedback": "Image captured (offline mode — set GEMINI_API_KEY for live evaluation)",
-            "issues": [],
+            "approved": False,
+            "quality_score": 0.0,
+            "feedback": "Evaluation unavailable (offline mode) — set GEMINI_API_KEY for live evaluation.",
+            "issues": ["Offline mode"],
             "detected": {},
         }
 
@@ -536,46 +558,58 @@ async def evaluate_frame(image_base64: str, frame_type: str) -> dict:
         },
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
-            if resp.status_code != 200:
-                logger.error(f"Gemini evaluate_frame HTTP {resp.status_code}: {resp.text[:300]}")
-                return {"approved": True, "quality_score": 0.6, "feedback": "Evaluation unavailable — image accepted", "issues": [], "detected": {}}
+    import asyncio
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
+                if resp.status_code != 200:
+                    logger.error(f"Gemini evaluate_frame HTTP {resp.status_code}: {resp.text[:300]}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1)
+                        continue
+                    return {"approved": False, "quality_score": 0.0, "feedback": "Could not verify image — please retake", "issues": ["API Error"], "detected": {}}
 
-            data = resp.json()
-            if "candidates" not in data or not data["candidates"]:
-                logger.error(f"Gemini returned no candidates: {json.dumps(data)[:300]}")
-                return {"approved": True, "quality_score": 0.6, "feedback": "No evaluation returned — image accepted", "issues": [], "detected": {}}
+                data = resp.json()
+                if "candidates" not in data or not data["candidates"]:
+                    logger.error(f"Gemini returned no candidates: {json.dumps(data)[:300]}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1)
+                        continue
+                    return {"approved": False, "quality_score": 0.0, "feedback": "Could not verify image — please retake", "issues": ["Empty Response"], "detected": {}}
 
-            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            logger.info(f"Gemini raw response [{frame_type}]: {text[:200]}")
+                text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                logger.info(f"Gemini raw response [{frame_type}]: {text[:200]}")
 
-            # Strip markdown fences if present
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
+                # Strip markdown fences if present
+                if text.startswith("```json"):
+                    text = text[7:]
+                if text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                text = text.strip()
 
-            # Try direct parse first
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError:
-                match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-                else:
-                    logger.error(f"Could not parse Gemini response as JSON: {text[:200]}")
-                    return {"approved": True, "quality_score": 0.6, "feedback": "Image accepted", "issues": [], "detected": {}}
+                # Try direct parse first
+                try:
+                    result = json.loads(text)
+                except json.JSONDecodeError:
+                    match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+                    if match:
+                        result = json.loads(match.group())
+                    else:
+                        logger.error(f"Could not parse Gemini response as JSON: {text[:200]}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1)
+                            continue
+                        return {"approved": False, "quality_score": 0.0, "feedback": "Could not verify image — please retake", "issues": ["Parse Error"], "detected": {}}
 
-            result.setdefault("approved", True)
-            result.setdefault("quality_score", 0.7)
-            result.setdefault("feedback", "Image evaluated")
-            result.setdefault("issues", [])
-            result.setdefault("detected", {})
+                result.setdefault("approved", False)
+                result.setdefault("quality_score", 0.0)
+                result.setdefault("feedback", "Image evaluated")
+                result.setdefault("issues", [])
+                result.setdefault("detected", {})
             result["quality_score"] = max(0.0, min(1.0, float(result["quality_score"])))
 
             if frame_type == "macro" and live_price > 0:
@@ -601,6 +635,10 @@ async def evaluate_frame(image_base64: str, frame_type: str) -> dict:
             logger.info(f"Frame eval [{frame_type}]: approved={result['approved']}, score={result['quality_score']}")
             return result
 
-    except Exception as e:
-        logger.exception(f"Gemini evaluate_frame error: {e}")
-        return {"approved": True, "quality_score": 0.5, "feedback": "Could not evaluate — image accepted", "issues": [], "detected": {}}
+        except Exception as e:
+            logger.exception(f"Gemini evaluate_frame error (attempt {attempt+1}): {e}")
+            if attempt < max_retries - 1:
+                import asyncio
+                await asyncio.sleep(1)
+                continue
+            return {"approved": False, "quality_score": 0.0, "feedback": "Could not evaluate image — please retake", "issues": ["Exception"], "detected": {}}

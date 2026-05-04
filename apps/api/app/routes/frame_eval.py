@@ -59,10 +59,10 @@ async def evaluate_frame_endpoint(req: FrameEvalRequest):
 
     if not image_b64:
         return FrameEvalResponse(
-            approved=True,
-            quality_score=0.5,
-            feedback="Could not load image — accepted anyway",
-            issues=[],
+            approved=False,
+            quality_score=0.0,
+            feedback="Could not load image — please retake",
+            issues=["Image load failed"],
             detected={},
         )
 
@@ -108,10 +108,10 @@ async def evaluate_frame_ws(websocket: WebSocket):
 
             if not image_b64:
                 await websocket.send_json({
-                    "approved": True,
-                    "quality_score": 0.5,
-                    "feedback": "Could not load image — accepted anyway",
-                    "issues": [],
+                    "approved": False,
+                    "quality_score": 0.0,
+                    "feedback": "Could not load image — please retake",
+                    "issues": ["Image load failed"],
                     "detected": {},
                 })
                 continue
@@ -133,10 +133,10 @@ async def evaluate_frame_ws(websocket: WebSocket):
         logger.error(f"WebSocket evaluation error: {e}")
         try:
             await websocket.send_json({
-                "approved": True,
-                "quality_score": 0.5,
-                "feedback": f"Evaluation error — image accepted",
-                "issues": [],
+                "approved": False,
+                "quality_score": 0.0,
+                "feedback": f"Evaluation error — please retake",
+                "issues": ["Exception"],
                 "detected": {},
             })
         except:

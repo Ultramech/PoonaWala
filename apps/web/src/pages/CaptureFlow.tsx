@@ -140,13 +140,13 @@ export function CaptureFlow() {
       // Speak Poonawala AI feedback out loud
       speak(result.feedback)
     } catch {
-      const fallback = 'Image accepted. You may continue.'
+      const fallback = 'Unable to reach the server. Please check your connection and try again.'
       setEvals(prev => ({
         ...prev,
         [stepIdx]: {
-          state: 'approved',
+          state: 'rejected',
           dataUrl,
-          result: { approved: true, quality_score: 0.7, feedback: fallback, issues: [], detected: {} },
+          result: { approved: false, quality_score: 0.0, feedback: fallback, issues: ['Connection Error'], detected: {} },
         },
       }))
       speak(fallback)

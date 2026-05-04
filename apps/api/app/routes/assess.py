@@ -61,6 +61,48 @@ async def assess(request: Request, req: AssessRequest, db: AsyncSession = Depend
     trace_id = getattr(request.state, "trace_id", str(uuid.uuid4()))
     logger.info(f"[{trace_id}] assess start session={req.session_id} frames={len(req.frames)}")
 
+    # ── Pre-flight Gold Verification ──
+    if req.frames:
+        first_frame = req.frames[0]
+        if not first_frame.startswith("local://"):
+            try:
+                import base64
+                from app.data.gemini import evaluate_frame
+                from app.data.image_utils import fetch_image_bytes
+                
+                img_b64 = None
+                if first_frame.startswith("data:"):
+                    img_b64 = first_frame.split(",", 1)[1] if "," in first_frame else first_frame
+                else:
+                    raw = await fetch_image_bytes(first_frame)
+                    if raw:
+                        img_b64 = base64.b64encode(raw).decode("utf-8")
+                
+                if img_b64:
+                    pre_eval = await evaluate_frame(img_b64, "top")
+                    detected = pre_eval.get("detected", {})
+                    # If explicitly determined NOT to be gold jewelry
+                    if not pre_eval.get("approved", True) and detected.get("is_gold_jewelry") is False:
+                        logger.warning(f"[{trace_id}] Pre-flight rejected: item is not gold jewelry.")
+                        return AssessmentResult(
+                            session_id=req.session_id,
+                            timestamp_utc=datetime.now(timezone.utc),
+                            model_versions=ModelVersions(),
+                            purity=Purity(band_low_karat=0, band_high_karat=0, point_estimate_karat=0, huid_verified=False),
+                            weight=Weight(manual_entry_g=req.weight_g, estimated_g=0.0, band_low_g=0.0, band_high_g=0.0, method="hybrid"),
+                            value_inr=ValueINR(band_low=0, band_high=0, ibja_reference_date=datetime.now(timezone.utc), stone_weight_excluded_g=0.0),
+                            loan_offer=LoanOffer(band_low_inr=0, band_high_inr=0, ltv_applied_pct=0, tier="none"),
+                            confidence=Confidence(score=0.0, coverage_guarantee_pct=0, calibration_method="none"),
+                            fraud_signals=FraudSignals(score=1.0, triggers=["not_gold_jewelry"]),
+                            routing="REJECT",
+                            reasoning_text=ReasoningText(lang=req.lang, text="The item in the image is not recognized as gold jewelry."),
+                            xai=XAI(gradcam_url=None, shap_top_features=[], counterfactual=None),
+                            audit=AuditTrail(trace_id=trace_id, input_asset_hashes=[]),
+                            conformal_width_karat=0.0,
+                        )
+            except Exception as e:
+                logger.warning(f"[{trace_id}] Pre-flight check failed: {e}")
+
     macro_url = req.frames[3] if len(req.frames) > 3 else (req.frames[0] if req.frames else "")
 
     # ── Phase 5: S1→S2 and S5→S6 mini-pipelines; S3/S4/S7/S8/S9/S10/S11/S12 independent ──

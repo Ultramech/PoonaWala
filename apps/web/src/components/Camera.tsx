@@ -416,9 +416,14 @@ export function Camera({ type, onCapture, onError, facingMode = 'environment', i
 
           {/* Poonawala AI Guidance */}
           {!isVideo && !isAudio && (
-            <div className="absolute -bottom-1 left-4 right-4 py-2.5 px-4 rounded-b-2xl flex items-center gap-2 text-xs font-medium bg-black/60 text-white/90 border border-white/10 backdrop-blur-sm">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              <span className="truncate">{guidanceText}</span>
+            <div className="absolute -bottom-1 left-4 right-4 py-2.5 px-4 rounded-b-2xl flex items-center justify-between text-xs font-medium bg-black/60 text-white/90 border border-white/10 backdrop-blur-sm">
+              <div className="flex items-center gap-2 overflow-hidden mr-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                <span className="truncate">{guidanceText}</span>
+              </div>
+              <div className={clsx("flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border", quality.score > 70 ? "bg-green-500/20 text-green-400 border-green-500/30" : quality.score > 40 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-red-500/20 text-red-400 border-red-500/30")}>
+                Quality: {quality.score}%
+              </div>
             </div>
           )}
 
