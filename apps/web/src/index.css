@@ -16,7 +16,8 @@
   }
 
   body {
-    @apply bg-surface-0 text-white font-sans;
+    @apply text-white font-sans;
+    background-color: #080C18;
     font-feature-settings: 'kern' 1, 'liga' 1;
     -webkit-font-smoothing: antialiased;
   }
@@ -103,6 +104,10 @@
   .card-gold {
     @apply bg-surface-2 rounded-3xl border border-gold-500/20
            shadow-gold-sm;
+  }
+
+  .card-red {
+    @apply bg-surface-2 rounded-3xl border border-poonawala-red/20;
   }
 
   /* --- Inputs --- */
