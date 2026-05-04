@@ -8,14 +8,13 @@ Used for:
 import os
 import json
 import logging
-import asyncio
 from typing import Optional
-import aiohttp
+import httpx
 
 logger = logging.getLogger("goldeye.gemini")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.0-flash-exp"
+GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
@@ -103,57 +102,26 @@ Return ONLY valid JSON:
             ]
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60)
-            ) as resp:
-                if resp.status != 200:
-                    logger.error(f"Gemini audio API error: {resp.status}")
-                    return {
-                        "is_solid_gold": None,
-                        "confidence": 0.0,
-                        "acoustic_signature": "api_error",
-                        "reason": f"gemini_http_{resp.status}"
-                    }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Gemini audio API error: {resp.status_code}")
+                return {"is_solid_gold": None, "confidence": 0.0, "acoustic_signature": "api_error", "reason": f"gemini_http_{resp.status_code}"}
 
-                data = await resp.json()
-                if "candidates" not in data or not data["candidates"]:
-                    return {
-                        "is_solid_gold": None,
-                        "confidence": 0.0,
-                        "acoustic_signature": "no_response",
-                        "reason": "empty_gemini_response"
-                    }
+            data = resp.json()
+            if "candidates" not in data or not data["candidates"]:
+                return {"is_solid_gold": None, "confidence": 0.0, "acoustic_signature": "no_response", "reason": "empty_gemini_response"}
 
-                text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-                # Extract JSON from response
-                text_response = text_response.strip()
-                if text_response.startswith("```json"):
-                    text_response = text_response[7:]
-                if text_response.endswith("```"):
-                    text_response = text_response[:-3]
+            text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[7:]
+            if text_response.endswith("```"):
+                text_response = text_response[:-3]
+            return json.loads(text_response.strip())
 
-                result = json.loads(text_response.strip())
-                return result
-
-    except asyncio.TimeoutError:
-        logger.warning("Gemini audio API timeout")
-        return {
-            "is_solid_gold": None,
-            "confidence": 0.0,
-            "acoustic_signature": "timeout",
-            "reason": "gemini_timeout"
-        }
     except Exception as e:
         logger.exception(f"Gemini audio analysis error: {e}")
-        return {
-            "is_solid_gold": None,
-            "confidence": 0.0,
-            "acoustic_signature": "error",
-            "reason": str(e)
-        }
+        return {"is_solid_gold": None, "confidence": 0.0, "acoustic_signature": "error", "reason": str(e)}
 
 
 async def analyze_image_fallback(
@@ -256,34 +224,25 @@ Return JSON:
             ]
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60)
-            ) as resp:
-                if resp.status != 200:
-                    logger.error(f"Gemini image API error: {resp.status}")
-                    return {"error": f"gemini_http_{resp.status}", "confidence": 0.0}
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Gemini image API error: {resp.status_code}")
+                return {"error": f"gemini_http_{resp.status_code}", "confidence": 0.0}
 
-                data = await resp.json()
-                if "candidates" not in data or not data["candidates"]:
-                    return {"error": "empty_response", "confidence": 0.0}
+            data = resp.json()
+            if "candidates" not in data or not data["candidates"]:
+                return {"error": "empty_response", "confidence": 0.0}
 
-                text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-                text_response = text_response.strip()
-                if text_response.startswith("```json"):
-                    text_response = text_response[7:]
-                if text_response.endswith("```"):
-                    text_response = text_response[:-3]
+            text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[7:]
+            if text_response.endswith("```"):
+                text_response = text_response[:-3]
+            result = json.loads(text_response.strip())
+            result["gemini_analyzed"] = True
+            return result
 
-                result = json.loads(text_response.strip())
-                result["gemini_analyzed"] = True
-                return result
-
-    except asyncio.TimeoutError:
-        logger.warning(f"Gemini {analysis_type} API timeout")
-        return {"error": "gemini_timeout", "confidence": 0.0}
     except Exception as e:
         logger.exception(f"Gemini {analysis_type} error: {e}")
         return {"error": str(e), "confidence": 0.0}
@@ -327,24 +286,18 @@ Respond with JSON:
             ]
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
-                if resp.status != 200:
-                    return {"decision": None, "error": f"http_{resp.status}"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
+            if resp.status_code != 200:
+                return {"decision": None, "error": f"http_{resp.status_code}"}
 
-                data = await resp.json()
-                text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-                text_response = text_response.strip()
-                if text_response.startswith("```json"):
-                    text_response = text_response[7:]
-                if text_response.endswith("```"):
-                    text_response = text_response[:-3]
-
-                return json.loads(text_response.strip())
+            data = resp.json()
+            text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[7:]
+            if text_response.endswith("```"):
+                text_response = text_response[:-3]
+            return json.loads(text_response.strip())
 
     except Exception as e:
         logger.exception(f"Gemini decision error: {e}")
@@ -584,88 +537,70 @@ async def evaluate_frame(image_base64: str, frame_type: str) -> dict:
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    logger.error(f"Gemini evaluate_frame HTTP {resp.status}: {body[:300]}")
-                    return {"approved": True, "quality_score": 0.6, "feedback": "Evaluation unavailable — image accepted", "issues": [], "detected": {}}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Gemini evaluate_frame HTTP {resp.status_code}: {resp.text[:300]}")
+                return {"approved": True, "quality_score": 0.6, "feedback": "Evaluation unavailable — image accepted", "issues": [], "detected": {}}
 
-                data = await resp.json()
-                if "candidates" not in data or not data["candidates"]:
-                    logger.error(f"Gemini returned no candidates: {json.dumps(data)[:300]}")
-                    return {"approved": True, "quality_score": 0.6, "feedback": "No evaluation returned — image accepted", "issues": [], "detected": {}}
+            data = resp.json()
+            if "candidates" not in data or not data["candidates"]:
+                logger.error(f"Gemini returned no candidates: {json.dumps(data)[:300]}")
+                return {"approved": True, "quality_score": 0.6, "feedback": "No evaluation returned — image accepted", "issues": [], "detected": {}}
 
-                text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                logger.info(f"Gemini raw response [{frame_type}]: {text[:200]}")
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            logger.info(f"Gemini raw response [{frame_type}]: {text[:200]}")
 
-                # Strip markdown fences if present
-                if text.startswith("```json"):
-                    text = text[7:]
-                if text.startswith("```"):
-                    text = text[3:]
-                if text.endswith("```"):
-                    text = text[:-3]
-                text = text.strip()
+            # Strip markdown fences if present
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
 
-                # Try direct parse first
-                try:
-                    result = json.loads(text)
-                except json.JSONDecodeError:
-                    # Fallback: extract first JSON object with regex
-                    match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
-                    if match:
-                        result = json.loads(match.group())
+            # Try direct parse first
+            try:
+                result = json.loads(text)
+            except json.JSONDecodeError:
+                match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+                if match:
+                    result = json.loads(match.group())
+                else:
+                    logger.error(f"Could not parse Gemini response as JSON: {text[:200]}")
+                    return {"approved": True, "quality_score": 0.6, "feedback": "Image accepted", "issues": [], "detected": {}}
+
+            result.setdefault("approved", True)
+            result.setdefault("quality_score", 0.7)
+            result.setdefault("feedback", "Image evaluated")
+            result.setdefault("issues", [])
+            result.setdefault("detected", {})
+            result["quality_score"] = max(0.0, min(1.0, float(result["quality_score"])))
+
+            if frame_type == "macro" and live_price > 0:
+                detected = result.get("detected", {})
+                karat_num = detected.get("karat_numeric")
+                if karat_num is None:
+                    km = detected.get("karat_marking") or ""
+                    import re as _re
+                    m = _re.search(r"(\d{1,2})[Kk]", km)
+                    if m:
+                        karat_num = int(m.group(1))
                     else:
-                        logger.error(f"Could not parse Gemini response as JSON: {text[:200]}")
-                        return {"approved": True, "quality_score": 0.6, "feedback": "Image accepted", "issues": [], "detected": {}}
+                        m2 = _re.search(r"(\d{3})", km)
+                        if m2:
+                            karat_num = round(int(m2.group(1)) * 24 / 1000)
+                if karat_num and 8 <= karat_num <= 24:
+                    price_per_g = round(live_price * karat_num / 24, 0)
+                    detected["estimated_price_per_g"] = price_per_g
+                    detected["karat_numeric"] = karat_num
+                    if detected.get("hallmark_visible") and "₹" not in result["feedback"]:
+                        result["feedback"] += f" Estimated ₹{int(price_per_g):,}/g at current IBJA rate."
 
-                # Ensure all required fields exist
-                result.setdefault("approved", True)
-                result.setdefault("quality_score", 0.7)
-                result.setdefault("feedback", "Image evaluated")
-                result.setdefault("issues", [])
-                result.setdefault("detected", {})
+            logger.info(f"Frame eval [{frame_type}]: approved={result['approved']}, score={result['quality_score']}")
+            return result
 
-                # Clamp quality_score to [0.0, 1.0]
-                result["quality_score"] = max(0.0, min(1.0, float(result["quality_score"])))
-
-                # For macro: compute estimated price per gram if karat detected and price available
-                if frame_type == "macro" and live_price > 0:
-                    detected = result.get("detected", {})
-                    karat_num = detected.get("karat_numeric")
-                    if karat_num is None:
-                        # Try parsing from karat_marking string
-                        km = detected.get("karat_marking") or ""
-                        import re as _re
-                        m = _re.search(r"(\d{1,2})[Kk]", km)
-                        if m:
-                            karat_num = int(m.group(1))
-                        else:
-                            # fineness like "916" → 22K, "750" → 18K
-                            m2 = _re.search(r"(\d{3})", km)
-                            if m2:
-                                fineness = int(m2.group(1))
-                                karat_num = round(fineness * 24 / 1000)
-
-                    if karat_num and 8 <= karat_num <= 24:
-                        price_per_g = round(live_price * karat_num / 24, 0)
-                        detected["estimated_price_per_g"] = price_per_g
-                        detected["karat_numeric"] = karat_num
-                        # Enrich feedback with price if hallmark was found
-                        if detected.get("hallmark_visible") and "₹" not in result["feedback"]:
-                            result["feedback"] += f" Estimated ₹{int(price_per_g):,}/g at current IBJA rate."
-
-                logger.info(f"Frame eval [{frame_type}]: approved={result['approved']}, score={result['quality_score']}")
-                return result
-
-    except asyncio.TimeoutError:
-        logger.warning("Gemini evaluate_frame timeout")
-        return {"approved": True, "quality_score": 0.5, "feedback": "Evaluation timed out — image accepted", "issues": [], "detected": {}}
     except Exception as e:
         logger.exception(f"Gemini evaluate_frame error: {e}")
         return {"approved": True, "quality_score": 0.5, "feedback": "Could not evaluate — image accepted", "issues": [], "detected": {}}
