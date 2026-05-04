@@ -4,8 +4,7 @@
 
 GoldEye is a full-stack Progressive Web App built for Poonawala Fincorp that lets borrowers photograph their gold jewelry and receive a real-time loan estimate backed by live IBJA gold prices, 12 AI signal workers, a custom-trained LightGBM fusion model, and 4-layer explainable AI. The assessment pipeline is stateless and client-agnostic — the same backend serves the PWA today and WhatsApp/IVR channels tomorrow.
 
-All vision and audio models are trained in-house on real jewelry catalogue data scraped from **Tanishq**, **CaratLane**, and **Bhasali Jewellers** — no third-party AI APIs are used in the assessment pipeline.
-
+All vision and audio models are trained in-house on real jewelry catalogue data scraped from **Tanishq**, **CaratLane**, and **Bhasali Jewellers**.
 ---
 
 ## Table of Contents
