@@ -11,14 +11,25 @@ import { Result } from './pages/Result'
 import { Dashboard } from './pages/Dashboard'
 import { DashboardDetail } from './pages/DashboardDetail'
 import { FieldAgent } from './pages/FieldAgent'
-import { useSessionStore } from './store/session'
+import { Home } from './pages/Home'
+import { LoanEstimator } from './pages/LoanEstimator'
+import { LoanHistory } from './pages/LoanHistory'
+import { Profile } from './pages/Profile'
 
 function App() {
   return (
     <BrowserRouter>
       <div className="max-w-md mx-auto min-h-screen relative overflow-hidden">
         <Routes>
-          <Route path="/" element={<Navigate to="/language" replace />} />
+          {/* New primary navigation */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/estimate" element={<LoanEstimator />} />
+          <Route path="/history" element={<LoanHistory />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/apply" element={<Navigate to="/consent" replace />} />
+
+          {/* Loan application flow (unchanged) */}
           <Route path="/language" element={<LanguagePicker />} />
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/consent" element={<Consent />} />
@@ -28,10 +39,13 @@ function App() {
           <Route path="/weight" element={<WeightEntry />} />
           <Route path="/processing" element={<Processing />} />
           <Route path="/result" element={<Result />} />
+
+          {/* NBFC dashboard */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/session/:id" element={<DashboardDetail />} />
           <Route path="/agent" element={<FieldAgent />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </div>
     </BrowserRouter>

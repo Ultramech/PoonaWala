@@ -159,7 +159,7 @@ export function Result() {
     <div className="page overflow-y-auto no-scrollbar animate-fade-in">
       {/* Header */}
       <div className="page-header">
-        <button id="result-home" onClick={() => { reset(); navigate('/') }} className="btn-icon">
+        <button id="result-home" onClick={() => { reset(); navigate('/home') }} className="btn-icon">
           <ChevronRight className="w-5 h-5 rotate-180 text-white/60" />
         </button>
         <span className="font-display font-semibold text-sm text-white/70">Poonawala GoldEye Result</span>
@@ -356,7 +356,7 @@ export function Result() {
       <div className="mx-5 mb-4 space-y-3">
         <button
           id="result-primary-action"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className={routing.actionColor === 'btn-gold' ? 'btn-gold w-full' : 'btn-outline-gold w-full'}
         >
           {routing.action}
